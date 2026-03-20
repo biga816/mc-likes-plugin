@@ -1,0 +1,18 @@
+limits:
+  dailyDirectLikeLimit: 20
+  pairCooldownSeconds: 60
+  boostCooldownSeconds: 0
+
+recent:
+  bufferSize: 100
+  displaySize: 5
+
+reason:
+  maxLength: 48
+  disallowColorCodes: true
+  disallowNewlines: true
+
+broadcast:
+  enabled: true
+  prefix: "[LIKE]"
+  showShortIdInHover: true

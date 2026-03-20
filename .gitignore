@@ -1,0 +1,15 @@
+# Gradle
+.gradle
+build
+
+# OS
+.DS_Store
+
+# Logs
+logs/
+
+# Ignore Kotlin plugin data
+.kotlin
+
+# Minecraft test server
+paper-test/
