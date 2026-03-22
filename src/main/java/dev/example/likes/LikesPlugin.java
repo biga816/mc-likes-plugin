@@ -10,6 +10,7 @@ import dev.example.likes.database.EventRepository;
 import dev.example.likes.service.CooldownService;
 import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
+import dev.example.likes.util.I18nService;
 import dev.example.likes.util.MessageFactory;
 import dev.example.likes.util.ShortIdGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -19,18 +20,23 @@ import java.util.logging.Level;
 
 /**
  * Entry point for the Likes plugin.
- * Initializes the database, wires dependencies, and registers commands in onEnable().
- * Closes the database connection in onDisable().
+ * Initializes i18n, the database, wires dependencies, and registers commands in onEnable().
+ * Closes the database connection and unregisters translations in onDisable().
  */
 public class LikesPlugin extends JavaPlugin {
 
     private DatabaseManager databaseManager;
+    private I18nService i18nService;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
 
-        // 1. Create data folder and initialize database connection
+        // 1. Initialize i18n translations
+        i18nService = new I18nService();
+        i18nService.initialize(getClass().getClassLoader());
+
+        // 2. Create data folder and initialize database connection
         getDataFolder().mkdirs();
         try {
             databaseManager = new DatabaseManager(getDataFolder());
@@ -45,12 +51,12 @@ public class LikesPlugin extends JavaPlugin {
             return;
         }
 
-        // 2. Initialize repositories
+        // 3. Initialize repositories
         BroadcastRepository broadcastRepo = new BroadcastRepository(databaseManager);
         EventRepository eventRepo = new EventRepository(databaseManager);
         DailyLimitRepository dailyRepo = new DailyLimitRepository(databaseManager);
 
-        // 3. Initialize services
+        // 4. Initialize services
         CooldownService cooldownService = new CooldownService(getConfig());
         RecentService recentService = new RecentService(getConfig());
         try {
@@ -70,7 +76,7 @@ public class LikesPlugin extends JavaPlugin {
             getConfig(), this
         );
 
-        // 4. Register commands
+        // 5. Register commands
         LikeCommand likeCommand = new LikeCommand(likeService, messageFactory);
         getCommand("like").setExecutor(likeCommand);
         getCommand("like").setTabCompleter(likeCommand);
@@ -82,6 +88,9 @@ public class LikesPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (i18nService != null) {
+            i18nService.close();
+        }
         if (databaseManager != null) {
             databaseManager.close();
         }

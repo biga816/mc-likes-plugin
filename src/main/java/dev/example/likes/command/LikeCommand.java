@@ -2,6 +2,7 @@ package dev.example.likes.command;
 
 import dev.example.likes.service.LikeService;
 import dev.example.likes.util.MessageFactory;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -52,18 +53,18 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         // 1. Reject console execution
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("このコマンドはプレイヤーのみ使用できます");
+            sender.sendMessage(messageFactory.error("likes.error.console-only"));
             return true;
         }
         // 2. Validate arguments
         if (args.length < 2) {
-            player.sendMessage(messageFactory.info("使用法: /like <player> <reason...>"));
+            player.sendMessage(messageFactory.info("likes.command.like.usage"));
             return true;
         }
         // 3. Resolve target player
         Player target = Bukkit.getPlayer(args[0]);
         if (target == null) {
-            player.sendMessage(messageFactory.error("プレイヤー \"" + args[0] + "\" はオンラインではありません"));
+            player.sendMessage(messageFactory.error("likes.error.player-not-found", Component.text(args[0])));
             return true;
         }
         // 4. Join remaining arguments into the reason string

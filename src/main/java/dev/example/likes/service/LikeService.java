@@ -8,6 +8,7 @@ import dev.example.likes.model.LikesEvent;
 import dev.example.likes.util.MessageFactory;
 import dev.example.likes.util.ShortIdGenerator;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -88,29 +89,29 @@ public class LikeService {
     public void sendLike(Player sender, Player target, String reason) {
         // 1. Validate inputs
         if (reason == null || reason.isEmpty()) {
-            sender.sendMessage(messageFactory.error("理由を入力してください"));
+            sender.sendMessage(messageFactory.error("likes.error.reason.empty"));
             return;
         }
         int maxLength = config.getInt("reason.maxLength", 48);
         if (reason.length() > maxLength) {
-            sender.sendMessage(messageFactory.error("理由が長すぎます（最大" + maxLength + "文字）"));
+            sender.sendMessage(messageFactory.error("likes.error.reason.too-long", Component.text(maxLength)));
             return;
         }
         if (reason.contains("\n") || reason.contains("\r")) {
-            sender.sendMessage(messageFactory.error("理由に改行は使用できません"));
+            sender.sendMessage(messageFactory.error("likes.error.reason.newline"));
             return;
         }
 
         // 2. Disallow self-like
         if (sender.getUniqueId().equals(target.getUniqueId())) {
-            sender.sendMessage(messageFactory.error("自分自身にいいねはできません"));
+            sender.sendMessage(messageFactory.error("likes.error.self"));
             return;
         }
 
         // 3. Check cooldown
         if (cooldownService.isOnCooldown(sender.getUniqueId(), target.getUniqueId())) {
             long remaining = cooldownService.getRemainingSeconds(sender.getUniqueId(), target.getUniqueId());
-            sender.sendMessage(messageFactory.error("クールダウン中です（残り " + remaining + " 秒）"));
+            sender.sendMessage(messageFactory.error("likes.error.cooldown", Component.text(remaining)));
             return;
         }
 
@@ -120,12 +121,12 @@ public class LikeService {
         try {
             int dailyCount = dailyLimitRepository.getDailyCount(today, sender.getUniqueId());
             if (dailyCount >= dailyLimit) {
-                sender.sendMessage(messageFactory.error("本日のいいね上限（" + dailyLimit + "回）に達しました"));
+                sender.sendMessage(messageFactory.error("likes.error.daily-limit", Component.text(dailyLimit)));
                 return;
             }
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to get daily count for " + sender.getUniqueId(), e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
@@ -135,7 +136,7 @@ public class LikeService {
             shortId = shortIdGenerator.generateUnique();
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to generate unique shortId", e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
@@ -156,7 +157,7 @@ public class LikeService {
             broadcastRepository.save(broadcast);
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to save broadcast", e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
@@ -173,7 +174,7 @@ public class LikeService {
             eventRepository.save(event);
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to save event", e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
@@ -182,7 +183,7 @@ public class LikeService {
             dailyLimitRepository.increment(today, sender.getUniqueId());
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to increment daily count for " + sender.getUniqueId(), e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
@@ -193,13 +194,18 @@ public class LikeService {
         recentService.add(broadcast);
         Bukkit.getOnlinePlayers().forEach(p -> recentService.updateLastSeen(p.getUniqueId(), broadcast.broadcastId()));
 
-        // 11. Broadcast to all players
-        String senderName = sender.getName();
+        // 11. Send success notification to the sender
         String targetName = target.getName();
-        Component msg = messageFactory.buildBroadcastMessage(broadcast, senderName, targetName);
-        Bukkit.getServer().broadcast(msg);
+        sender.sendMessage(messageFactory.success(
+                "likes.command.sent",
+                Component.text(targetName).color(NamedTextColor.WHITE),
+                Component.text(reason).color(NamedTextColor.GRAY)));
 
-        // 12. Send personal notification to the target
+        // 12. Broadcast to all players
+        String senderName = sender.getName();
+        Bukkit.getServer().broadcast(messageFactory.buildBroadcastMessage(broadcast, senderName, targetName));
+
+        // 13. Send personal notification to the target
         target.sendMessage(messageFactory.buildTargetNotification(broadcast, senderName));
     }
 
@@ -219,25 +225,25 @@ public class LikeService {
         try {
             var optBroadcast = broadcastRepository.findByShortId(shortId);
             if (optBroadcast.isEmpty()) {
-                sender.sendMessage(messageFactory.error("指定されたIDのいいねが見つかりません: " + shortId));
+                sender.sendMessage(messageFactory.error("likes.error.not-found", Component.text(shortId)));
                 return;
             }
             broadcast = optBroadcast.get();
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to find broadcast by shortId: " + shortId, e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
         // 2. Check for duplicate reaction
         try {
             if (eventRepository.exists(broadcast.broadcastId(), sender.getUniqueId())) {
-                sender.sendMessage(messageFactory.error("すでにリアクション済みです"));
+                sender.sendMessage(messageFactory.error("likes.error.already-reacted"));
                 return;
             }
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to check event existence for broadcastId: " + broadcast.broadcastId(), e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
@@ -254,16 +260,16 @@ public class LikeService {
         try {
             eventRepository.save(event);
         } catch (SQLIntegrityConstraintViolationException e) {
-            sender.sendMessage(messageFactory.error("すでにリアクション済みです"));
+            sender.sendMessage(messageFactory.error("likes.error.already-reacted"));
             return;
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to save react event for broadcastId: " + broadcast.broadcastId(), e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
         // 4. Send success message
-        sender.sendMessage(messageFactory.success("リアクションしました！"));
+        sender.sendMessage(messageFactory.success("likes.likeboost.success"));
 
         // 5. Update lastSeen
         recentService.updateLastSeen(sender.getUniqueId(), broadcast.broadcastId());
@@ -283,7 +289,7 @@ public class LikeService {
         // 1. Retrieve lastSeenBroadcastId
         var optShortId = recentService.getLastSeenBroadcastId(sender.getUniqueId());
         if (optShortId.isEmpty()) {
-            sender.sendMessage(messageFactory.error("リアクション対象のいいねがありません。/likes recent で確認してください"));
+            sender.sendMessage(messageFactory.error("likes.error.no-recent"));
             return;
         }
 
@@ -298,13 +304,13 @@ public class LikeService {
                     .filter(b -> b.broadcastId().equals(broadcastId))
                     .findFirst();
             if (optBroadcast.isEmpty()) {
-                sender.sendMessage(messageFactory.error("リアクション対象のいいねがありません。/likes recent で確認してください"));
+                sender.sendMessage(messageFactory.error("likes.error.no-recent"));
                 return;
             }
             shortId = optBroadcast.get().shortId();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Failed to find broadcast from recent buffer: " + broadcastId, e);
-            sender.sendMessage(messageFactory.error("内部エラーが発生しました"));
+            sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 

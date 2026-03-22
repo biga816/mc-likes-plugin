@@ -2,6 +2,7 @@ package dev.example.likes.util;
 
 import dev.example.likes.model.LikesBroadcast;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -11,8 +12,9 @@ import org.bukkit.configuration.file.FileConfiguration;
 /**
  * Factory for building chat message components using the Adventure API.
  * <p>
- * Reads configuration values such as the prefix from {@link FileConfiguration}
- * and assembles broadcast, notification, and general-purpose messages.
+ * User-facing text is expressed as {@link Component#translatable(String)} keys,
+ * which Adventure / Paper resolves to each player's client locale at send time
+ * via {@link net.kyori.adventure.translation.GlobalTranslator}.
  * </p>
  */
 public class MessageFactory {
@@ -34,10 +36,6 @@ public class MessageFactory {
      * <p>
      * Format: {@code [LIKE] senderName → targetName  "reasonText"  [👍 React]}
      * </p>
-     * <p>
-     * The {@code [👍 React]} button is given a clickEvent that runs
-     * {@code /likeboost <shortId>} and a hoverEvent showing the short ID.
-     * </p>
      *
      * @param broadcast  the broadcast data
      * @param senderName the sender's display name
@@ -47,12 +45,13 @@ public class MessageFactory {
     public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName) {
         String shortId = broadcast.shortId();
 
-        Component reactButton = Component.text("[👍 React]")
+        Component reactButton = Component.translatable("likes.broadcast.react")
             .color(NamedTextColor.GREEN)
             .decorate(TextDecoration.BOLD)
             .clickEvent(ClickEvent.runCommand("/likeboost " + shortId))
             .hoverEvent(HoverEvent.showText(
-                Component.text("Click to react\nID: ")
+                Component.translatable("likes.broadcast.react.hover")
+                    .append(Component.text("\nID: "))
                     .append(Component.text(shortId).color(NamedTextColor.YELLOW))
             ));
 
@@ -70,7 +69,8 @@ public class MessageFactory {
     /**
      * Builds a personal notification message for the target player.
      * <p>
-     * Format: {@code [LIKE] senderName liked you: "reasonText"}
+     * Uses the {@code likes.notification.body} translation key with the sender's name
+     * and reason as arguments, allowing per-player locale rendering.
      * </p>
      *
      * @param broadcast  the broadcast data
@@ -81,38 +81,43 @@ public class MessageFactory {
         return Component.text(prefix)
             .color(NamedTextColor.AQUA)
             .append(Component.text(" "))
-            .append(Component.text(senderName).color(NamedTextColor.WHITE))
-            .append(Component.text(" があなたにいいねしました: ").color(NamedTextColor.GRAY))
-            .append(Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
+            .append(Component.translatable(
+                "likes.notification.body",
+                Component.text(senderName).color(NamedTextColor.WHITE),
+                Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY)
+            ).color(NamedTextColor.GRAY));
     }
 
     /**
-     * Builds an error message component.
+     * Builds an error message component from a translation key.
      *
-     * @param message the error message text
+     * @param key  the translation key (e.g. {@code "likes.error.self"})
+     * @param args optional translation arguments ({@code {0}}, {@code {1}}, …)
      * @return a red {@link Component}
      */
-    public Component error(String message) {
-        return Component.text(message).color(NamedTextColor.RED);
+    public Component error(String key, ComponentLike... args) {
+        return Component.translatable(key, args).color(NamedTextColor.RED);
     }
 
     /**
-     * Builds an informational message component.
+     * Builds an informational message component from a translation key.
      *
-     * @param message the informational message text
+     * @param key  the translation key
+     * @param args optional translation arguments
      * @return a yellow {@link Component}
      */
-    public Component info(String message) {
-        return Component.text(message).color(NamedTextColor.YELLOW);
+    public Component info(String key, ComponentLike... args) {
+        return Component.translatable(key, args).color(NamedTextColor.YELLOW);
     }
 
     /**
-     * Builds a success message component.
+     * Builds a success message component from a translation key.
      *
-     * @param message the success message text
+     * @param key  the translation key
+     * @param args optional translation arguments
      * @return a green {@link Component}
      */
-    public Component success(String message) {
-        return Component.text(message).color(NamedTextColor.GREEN);
+    public Component success(String key, ComponentLike... args) {
+        return Component.translatable(key, args).color(NamedTextColor.GREEN);
     }
 }

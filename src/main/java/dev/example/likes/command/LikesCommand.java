@@ -54,13 +54,13 @@ public class LikesCommand implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         // 1. Reject console execution
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("このコマンドはプレイヤーのみ使用できます");
+            sender.sendMessage(messageFactory.error("likes.error.console-only"));
             return true;
         }
 
         // 2. Validate sub-command
         if (args.length < 1 || !args[0].equalsIgnoreCase("recent")) {
-            player.sendMessage(messageFactory.info("使用法: /likes recent"));
+            player.sendMessage(messageFactory.info("likes.command.likes.usage"));
             return true;
         }
 
@@ -69,11 +69,12 @@ public class LikesCommand implements CommandExecutor {
 
         // 4. Check if the list is empty
         if (recent.isEmpty()) {
-            player.sendMessage(messageFactory.info("直近のいいねはありません"));
+            player.sendMessage(messageFactory.info("likes.recent.empty"));
             return true;
         }
 
-        // 5. Display each broadcast
+        // 5. Display title then each broadcast
+        player.sendMessage(messageFactory.info("likes.recent.title"));
         for (LikesBroadcast broadcast : recent) {
             String senderName = resolveName(broadcast.sourceSenderUuid());
             String targetName = resolveName(broadcast.targetUuid());

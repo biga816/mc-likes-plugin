@@ -16,16 +16,17 @@ import org.bukkit.entity.Player;
 public class LikeBoostCommand implements CommandExecutor {
 
     private final LikeService likeService;
+    private final MessageFactory messageFactory;
 
     /**
      * Constructs a LikeBoostCommand.
      *
      * @param likeService    service handling like sending and reactions
-     * @param messageFactory message factory (reserved for future use, currently unused)
+     * @param messageFactory message factory
      */
-    @SuppressWarnings("unused")
     public LikeBoostCommand(LikeService likeService, MessageFactory messageFactory) {
         this.likeService = likeService;
+        this.messageFactory = messageFactory;
     }
 
     /**
@@ -46,7 +47,7 @@ public class LikeBoostCommand implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         // Reject console execution
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("このコマンドはプレイヤーのみ使用できます");
+            sender.sendMessage(messageFactory.error("likes.error.console-only"));
             return true;
         }
 
