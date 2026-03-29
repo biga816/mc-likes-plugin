@@ -7,9 +7,9 @@ import java.util.UUID;
  * Represents a single like sent by a player in response to a broadcast.
  */
 public record LikesEvent(
-    String eventId,
-    long createdAt,
-    String broadcastId,
-    UUID senderUuid,
-    UUID targetUuid
-) {}
+        String eventId,
+        long createdAt,
+        String broadcastId,
+        UUID senderUuid,
+        UUID targetUuid) {
+}

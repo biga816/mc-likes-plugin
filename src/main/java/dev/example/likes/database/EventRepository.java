@@ -32,10 +32,10 @@ public class EventRepository {
      */
     public void save(LikesEvent event) throws SQLException {
         String sql = """
-            INSERT INTO likes_events
-                (event_id, created_at, broadcast_id, sender_uuid, target_uuid)
-            VALUES (?, ?, ?, ?, ?)
-            """;
+                INSERT INTO likes_events
+                    (event_id, created_at, broadcast_id, sender_uuid, target_uuid)
+                VALUES (?, ?, ?, ?, ?)
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, event.eventId());
@@ -44,6 +44,24 @@ public class EventRepository {
             ps.setString(4, event.senderUuid().toString());
             ps.setString(5, event.targetUuid().toString());
             ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Returns the total number of events (reactions) for the given broadcast ID.
+     *
+     * @param broadcastId the broadcast ID to count
+     * @return the number of events
+     * @throws SQLException if a database operation fails
+     */
+    public int countByBroadcastId(String broadcastId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM likes_events WHERE broadcast_id = ?";
+        Connection conn = databaseManager.getConnection();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, broadcastId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
         }
     }
 

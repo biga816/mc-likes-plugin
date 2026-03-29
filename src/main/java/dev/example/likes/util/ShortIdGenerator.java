@@ -24,7 +24,8 @@ public class ShortIdGenerator {
     /**
      * Constructs a ShortIdGenerator with DB-backed uniqueness checking.
      *
-     * @param broadcastRepository the broadcast repository used for collision detection
+     * @param broadcastRepository the broadcast repository used for collision
+     *                            detection
      */
     public ShortIdGenerator(BroadcastRepository broadcastRepository) {
         this.broadcastRepository = broadcastRepository;
@@ -42,7 +43,8 @@ public class ShortIdGenerator {
      */
     public static String generate() {
         UUID uuid = UUID.randomUUID();
-        // Math.abs(Long.MIN_VALUE) stays negative; use bitwise AND to guarantee non-negative
+        // Math.abs(Long.MIN_VALUE) stays negative; use bitwise AND to guarantee
+        // non-negative
         long hash = (uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits()) & Long.MAX_VALUE;
         String base36 = Long.toString(hash, 36);
         // Normalise to exactly 8 characters (left-pad if short, truncate if long)
@@ -59,7 +61,8 @@ public class ShortIdGenerator {
      * </p>
      *
      * @return a DB-unique 8-character Base36 ID
-     * @throws SQLException if the maximum retry count is exceeded or a DB operation fails
+     * @throws SQLException if the maximum retry count is exceeded or a DB operation
+     *                      fails
      */
     public String generateUnique() throws SQLException {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {

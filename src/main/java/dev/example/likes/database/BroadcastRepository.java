@@ -35,10 +35,10 @@ public class BroadcastRepository {
      */
     public void save(LikesBroadcast broadcast) throws SQLException {
         String sql = """
-            INSERT INTO likes_broadcasts
-                (broadcast_id, short_id, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """;
+                INSERT INTO likes_broadcasts
+                    (broadcast_id, short_id, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, broadcast.broadcastId());
@@ -123,14 +123,13 @@ public class BroadcastRepository {
      */
     private LikesBroadcast mapRow(ResultSet rs) throws SQLException {
         return new LikesBroadcast(
-            rs.getString("broadcast_id"),
-            rs.getString("short_id"),
-            rs.getLong("created_at"),
-            rs.getString("source_type"),
-            UUID.fromString(rs.getString("source_sender_uuid")),
-            UUID.fromString(rs.getString("target_uuid")),
-            rs.getString("reason_code"),
-            rs.getString("reason_text")
-        );
+                rs.getString("broadcast_id"),
+                rs.getString("short_id"),
+                rs.getLong("created_at"),
+                rs.getString("source_type"),
+                UUID.fromString(rs.getString("source_sender_uuid")),
+                UUID.fromString(rs.getString("target_uuid")),
+                rs.getString("reason_code"),
+                rs.getString("reason_text"));
     }
 }

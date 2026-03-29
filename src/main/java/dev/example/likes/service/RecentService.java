@@ -25,7 +25,8 @@ public class RecentService {
     /**
      * Constructs a RecentService.
      *
-     * @param config plugin configuration; reads buffer size from {@code recent.bufferSize}.
+     * @param config plugin configuration; reads buffer size from
+     *               {@code recent.bufferSize}.
      *               Defaults to 100 entries.
      */
     public RecentService(FileConfiguration config) {
@@ -36,7 +37,8 @@ public class RecentService {
 
     /**
      * Loads recent broadcasts from the database into the buffer on startup.
-     * Data returned by the DB (created_at DESC) is reversed to ascending order before storing.
+     * Data returned by the DB (created_at DESC) is reversed to ascending order
+     * before storing.
      *
      * @param repo the broadcast repository
      * @throws SQLException if a database operation fails
@@ -95,7 +97,8 @@ public class RecentService {
      * Returns the last seen broadcast ID for the given player.
      *
      * @param playerUuid the player's UUID
-     * @return an Optional containing the last seen broadcast ID, or empty if not set
+     * @return an Optional containing the last seen broadcast ID, or empty if not
+     *         set
      */
     public Optional<String> getLastSeenBroadcastId(UUID playerUuid) {
         return Optional.ofNullable(lastSeenBroadcastId.get(playerUuid));

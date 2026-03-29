@@ -20,7 +20,8 @@ import java.util.logging.Level;
 
 /**
  * Entry point for the Likes plugin.
- * Initializes i18n, the database, wires dependencies, and registers commands in onEnable().
+ * Initializes i18n, the database, wires dependencies, and registers commands in
+ * onEnable().
  * Closes the database connection and unregisters translations in onDisable().
  */
 public class LikesPlugin extends JavaPlugin {
@@ -71,17 +72,16 @@ public class LikesPlugin extends JavaPlugin {
         MessageFactory messageFactory = new MessageFactory(getConfig());
 
         LikeService likeService = new LikeService(
-            broadcastRepo, eventRepo, dailyRepo,
-            shortIdGen, cooldownService, recentService, messageFactory,
-            getConfig(), this
-        );
+                broadcastRepo, eventRepo, dailyRepo,
+                shortIdGen, cooldownService, recentService, messageFactory,
+                getConfig(), this);
 
         // 5. Register commands
         LikeCommand likeCommand = new LikeCommand(likeService, messageFactory);
         getCommand("like").setExecutor(likeCommand);
         getCommand("like").setTabCompleter(likeCommand);
         getCommand("likeboost").setExecutor(new LikeBoostCommand(likeService, messageFactory));
-        getCommand("likes").setExecutor(new LikesCommand(recentService, messageFactory));
+        getCommand("likes").setExecutor(new LikesCommand(recentService, eventRepo, messageFactory));
 
         getLogger().info("Likes enabled!");
     }

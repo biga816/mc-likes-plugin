@@ -7,12 +7,12 @@ import java.util.UUID;
  * Represents a single broadcast event (a like solicitation).
  */
 public record LikesBroadcast(
-    String broadcastId,
-    String shortId,
-    long createdAt,
-    String sourceType,
-    UUID sourceSenderUuid,
-    UUID targetUuid,
-    String reasonCode,
-    String reasonText
-) {}
+        String broadcastId,
+        String shortId,
+        long createdAt,
+        String sourceType,
+        UUID sourceSenderUuid,
+        UUID targetUuid,
+        String reasonCode,
+        String reasonText) {
+}

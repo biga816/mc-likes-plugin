@@ -16,7 +16,8 @@ import java.util.List;
 /**
  * Handler for the /like &lt;player&gt; &lt;reason...&gt; command.
  * Can only be executed by players.
- * Tab completion returns online player names as suggestions (excluding the sender).
+ * Tab completion returns online player names as suggestions (excluding the
+ * sender).
  */
 public class LikeCommand implements CommandExecutor, TabCompleter {
 
@@ -37,10 +38,11 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
     /**
      * Handles the /like command.
      * <ol>
-     *   <li>Rejects execution from the console</li>
-     *   <li>Shows usage if arguments are insufficient</li>
-     *   <li>Shows an error if the target player is not online</li>
-     *   <li>Joins arguments into a reason string and calls {@link LikeService#sendLike}</li>
+     * <li>Rejects execution from the console</li>
+     * <li>Shows usage if arguments are insufficient</li>
+     * <li>Shows an error if the target player is not online</li>
+     * <li>Joins arguments into a reason string and calls
+     * {@link LikeService#sendLike}</li>
      * </ol>
      *
      * @param sender  command sender
@@ -76,7 +78,8 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
 
     /**
      * Handles tab completion for the /like command.
-     * For the first argument, returns online player names (excluding the sender) as suggestions.
+     * For the first argument, returns online player names (excluding the sender) as
+     * suggestions.
      *
      * @param sender  command sender
      * @param command command object
@@ -90,10 +93,10 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             // Complete with online player names, excluding the sender
             String partial = args[0].toLowerCase();
             return Bukkit.getOnlinePlayers().stream()
-                .filter(p -> !p.equals(sender))
-                .map(Player::getName)
-                .filter(name -> name.toLowerCase().startsWith(partial))
-                .toList();
+                    .filter(p -> !p.equals(sender))
+                    .map(Player::getName)
+                    .filter(name -> name.toLowerCase().startsWith(partial))
+                    .toList();
         }
         return List.of();
     }

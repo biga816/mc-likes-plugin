@@ -49,7 +49,8 @@ public class DailyLimitRepository {
 
     /**
      * Increments the like count for the given player on the specified date by 1.
-     * Creates a new record (count=1) if none exists, otherwise increments the existing one.
+     * Creates a new record (count=1) if none exists, otherwise increments the
+     * existing one.
      *
      * @param date       the target date in "yyyy-MM-dd" format
      * @param senderUuid the sender's UUID
@@ -57,11 +58,11 @@ public class DailyLimitRepository {
      */
     public void increment(String date, UUID senderUuid) throws SQLException {
         String sql = """
-            INSERT INTO likes_sender_daily (date, sender_uuid, direct_like_count)
-            VALUES (?, ?, 1)
-            ON CONFLICT(date, sender_uuid) DO UPDATE SET
-                direct_like_count = direct_like_count + 1
-            """;
+                INSERT INTO likes_sender_daily (date, sender_uuid, direct_like_count)
+                VALUES (?, ?, 1)
+                ON CONFLICT(date, sender_uuid) DO UPDATE SET
+                    direct_like_count = direct_like_count + 1
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, date);

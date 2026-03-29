@@ -1,5 +1,6 @@
 package dev.example.likes.command;
 
+import dev.example.likes.database.EventRepository;
 import dev.example.likes.model.LikesBroadcast;
 import dev.example.likes.service.RecentService;
 import dev.example.likes.util.MessageFactory;
@@ -10,7 +11,10 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.sql.SQLException;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Handler for the /likes recent command.
@@ -19,29 +23,37 @@ import java.util.List;
  */
 public class LikesCommand implements CommandExecutor {
 
+    private static final Logger log = Logger.getLogger(LikesCommand.class.getName());
+
     private final RecentService recentService;
+    private final EventRepository eventRepository;
     private final MessageFactory messageFactory;
 
     /**
      * Constructs a LikesCommand.
      *
-     * @param recentService  service managing recent broadcasts
-     * @param messageFactory message factory
+     * @param recentService   service managing recent broadcasts
+     * @param eventRepository repository for reaction counts
+     * @param messageFactory  message factory
      */
-    public LikesCommand(RecentService recentService, MessageFactory messageFactory) {
+    public LikesCommand(RecentService recentService, EventRepository eventRepository, MessageFactory messageFactory) {
         this.recentService = recentService;
+        this.eventRepository = eventRepository;
         this.messageFactory = messageFactory;
     }
 
     /**
      * Handles the /likes command.
      * <ol>
-     *   <li>Rejects execution from the console</li>
-     *   <li>Shows usage if the sub-command is not "recent"</li>
-     *   <li>Fetches the 5 most recent entries via {@link RecentService#getRecent(int)}</li>
-     *   <li>Notifies the player if there are no recent entries</li>
-     *   <li>Formats and displays each broadcast using {@link MessageFactory#buildBroadcastMessage}</li>
-     *   <li>Updates {@link RecentService#updateLastSeen} with the latest broadcastId after display</li>
+     * <li>Rejects execution from the console</li>
+     * <li>Shows usage if the sub-command is not "recent"</li>
+     * <li>Fetches the 5 most recent entries via
+     * {@link RecentService#getRecent(int)}</li>
+     * <li>Notifies the player if there are no recent entries</li>
+     * <li>Formats and displays each broadcast using
+     * {@link MessageFactory#buildBroadcastMessage}</li>
+     * <li>Updates {@link RecentService#updateLastSeen} with the latest broadcastId
+     * after display</li>
      * </ol>
      *
      * @param sender  command sender
@@ -78,7 +90,13 @@ public class LikesCommand implements CommandExecutor {
         for (LikesBroadcast broadcast : recent) {
             String senderName = resolveName(broadcast.sourceSenderUuid());
             String targetName = resolveName(broadcast.targetUuid());
-            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderName, targetName);
+            int count = 0;
+            try {
+                count = eventRepository.countByBroadcastId(broadcast.broadcastId());
+            } catch (SQLException e) {
+                log.log(Level.WARNING, "Failed to get reaction count for broadcastId: " + broadcast.broadcastId(), e);
+            }
+            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderName, targetName, count);
             player.sendMessage(msg);
         }
 
@@ -91,7 +109,8 @@ public class LikesCommand implements CommandExecutor {
     /**
      * Resolves a player display name from a UUID.
      * Prefers {@link Bukkit#getPlayer(java.util.UUID)} for online players,
-     * falling back to {@link Bukkit#getOfflinePlayer(java.util.UUID)} for offline players.
+     * falling back to {@link Bukkit#getOfflinePlayer(java.util.UUID)} for offline
+     * players.
      *
      * @param uuid the UUID to resolve
      * @return the player name, or the UUID string if it cannot be resolved

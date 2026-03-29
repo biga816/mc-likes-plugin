@@ -31,7 +31,8 @@ public class I18nService {
     private TranslationRegistry registry;
 
     /**
-     * Initialises the translation registry and registers it with {@link GlobalTranslator}.
+     * Initialises the translation registry and registers it with
+     * {@link GlobalTranslator}.
      * Call this once during plugin startup.
      *
      * @param classLoader the plugin's class loader used to locate resource files
@@ -40,11 +41,12 @@ public class I18nService {
         registry = TranslationRegistry.create(REGISTRY_KEY);
         registry.defaultLocale(Locale.US);
 
-        // Load all three .properties files via UTF-8 streams to support non-ASCII characters.
-        loadAndRegister(classLoader, Locale.US,    "messages_en_US.properties");
+        // Load all three .properties files via UTF-8 streams to support non-ASCII
+        // characters.
+        loadAndRegister(classLoader, Locale.US, "messages_en_US.properties");
         loadAndRegister(classLoader, Locale.JAPAN, "messages_ja_JP.properties");
         // Register ROOT as an extra safety fallback (same content as en_US).
-        loadAndRegister(classLoader, Locale.ROOT,  "messages.properties");
+        loadAndRegister(classLoader, Locale.ROOT, "messages.properties");
 
         GlobalTranslator.translator().addSource(registry);
     }

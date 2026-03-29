@@ -12,6 +12,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import net.kyori.adventure.audience.Audience;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.SQLException;
@@ -21,6 +22,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
  * Service responsible for the business logic of sending likes and reactions.
@@ -151,8 +153,7 @@ public class LikeService {
                 sender.getUniqueId(),
                 target.getUniqueId(),
                 "CUSTOM",
-                reason
-        );
+                reason);
         try {
             broadcastRepository.save(broadcast);
         } catch (SQLException e) {
@@ -168,8 +169,7 @@ public class LikeService {
                 now,
                 broadcastId,
                 sender.getUniqueId(),
-                target.getUniqueId()
-        );
+                target.getUniqueId());
         try {
             eventRepository.save(event);
         } catch (SQLException e) {
@@ -201,9 +201,14 @@ public class LikeService {
                 Component.text(targetName).color(NamedTextColor.WHITE),
                 Component.text(reason).color(NamedTextColor.GRAY)));
 
-        // 12. Broadcast to all players
+        // 12. Broadcast to all players except target, plus console
         String senderName = sender.getName();
-        Bukkit.getServer().broadcast(messageFactory.buildBroadcastMessage(broadcast, senderName, targetName));
+        Audience others = Audience.audience(
+                Stream.concat(
+                        Bukkit.getOnlinePlayers().stream()
+                                .filter(p -> !p.getUniqueId().equals(target.getUniqueId())),
+                        Stream.of(Bukkit.getConsoleSender())).collect(java.util.stream.Collectors.toList()));
+        others.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderName, targetName));
 
         // 13. Send personal notification to the target
         target.sendMessage(messageFactory.buildTargetNotification(broadcast, senderName));
@@ -212,7 +217,8 @@ public class LikeService {
     /**
      * Sends a reaction (like) to the broadcast identified by the given shortId.
      * <p>
-     * Sends an error message to the sender and returns early if the broadcast does not exist
+     * Sends an error message to the sender and returns early if the broadcast does
+     * not exist
      * or if the sender has already reacted.
      * </p>
      *
@@ -255,8 +261,7 @@ public class LikeService {
                 now,
                 broadcast.broadcastId(),
                 sender.getUniqueId(),
-                broadcast.targetUuid()
-        );
+                broadcast.targetUuid());
         try {
             eventRepository.save(event);
         } catch (SQLIntegrityConstraintViolationException e) {
@@ -278,7 +283,8 @@ public class LikeService {
     /**
      * Sends a reaction to the broadcast the player last saw.
      * <p>
-     * Retrieves the broadcastId via {@link RecentService#getLastSeenBroadcastId(UUID)}
+     * Retrieves the broadcastId via
+     * {@link RecentService#getLastSeenBroadcastId(UUID)}
      * and delegates to {@link #react(Player, String)}.
      * Sends an error message and returns early if no lastSeen entry exists.
      * </p>
@@ -294,11 +300,13 @@ public class LikeService {
         }
 
         // lastSeenBroadcastId stores the broadcastId; resolve the shortId by looking up
-        // the broadcast from the in-memory buffer before delegating to react(sender, shortId)
+        // the broadcast from the in-memory buffer before delegating to react(sender,
+        // shortId)
         String broadcastId = optShortId.get();
         String shortId;
         try {
-            // No direct findByBroadcastId method exists; search the in-memory recent buffer instead
+            // No direct findByBroadcastId method exists; search the in-memory recent buffer
+            // instead
             var recentList = recentService.getRecent(Integer.MAX_VALUE);
             var optBroadcast = recentList.stream()
                     .filter(b -> b.broadcastId().equals(broadcastId))

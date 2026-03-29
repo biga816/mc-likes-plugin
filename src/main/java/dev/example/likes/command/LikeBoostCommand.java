@@ -32,9 +32,10 @@ public class LikeBoostCommand implements CommandExecutor {
     /**
      * Handles the /likeboost command.
      * <ol>
-     *   <li>Rejects execution from the console</li>
-     *   <li>If a shortId is provided, calls {@link LikeService#react(Player, String)}</li>
-     *   <li>If shortId is omitted, calls {@link LikeService#react(Player)}</li>
+     * <li>Rejects execution from the console</li>
+     * <li>If a shortId is provided, calls
+     * {@link LikeService#react(Player, String)}</li>
+     * <li>If shortId is omitted, calls {@link LikeService#react(Player)}</li>
      * </ol>
      *
      * @param sender  command sender

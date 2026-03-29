@@ -20,7 +20,8 @@ public class CooldownService {
     /**
      * Constructs a CooldownService.
      *
-     * @param config plugin configuration; reads cooldown duration from {@code limits.pairCooldownSeconds}.
+     * @param config plugin configuration; reads cooldown duration from
+     *               {@code limits.pairCooldownSeconds}.
      *               Defaults to 60 seconds.
      */
     public CooldownService(FileConfiguration config) {
