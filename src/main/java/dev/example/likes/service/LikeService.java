@@ -201,12 +201,13 @@ public class LikeService {
                 Component.text(targetName).color(NamedTextColor.WHITE),
                 Component.text(reason).color(NamedTextColor.GRAY)));
 
-        // 12. Broadcast to all players except target, plus console
+        // 12. Broadcast to all players except sender and target, plus console
         String senderName = sender.getName();
         Audience others = Audience.audience(
                 Stream.concat(
                         Bukkit.getOnlinePlayers().stream()
-                                .filter(p -> !p.getUniqueId().equals(target.getUniqueId())),
+                                .filter(p -> !p.getUniqueId().equals(target.getUniqueId())
+                                        && !p.getUniqueId().equals(sender.getUniqueId())),
                         Stream.of(Bukkit.getConsoleSender())).collect(java.util.stream.Collectors.toList()));
         others.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderName, targetName));
 
@@ -241,7 +242,13 @@ public class LikeService {
             return;
         }
 
-        // 2. Check for duplicate reaction
+        // 2. Disallow self-react
+        if (sender.getUniqueId().equals(broadcast.targetUuid())) {
+            sender.sendMessage(messageFactory.error("likes.error.self"));
+            return;
+        }
+
+        // 3. Check for duplicate reaction
         try {
             if (eventRepository.exists(broadcast.broadcastId(), sender.getUniqueId())) {
                 sender.sendMessage(messageFactory.error("likes.error.already-reacted"));

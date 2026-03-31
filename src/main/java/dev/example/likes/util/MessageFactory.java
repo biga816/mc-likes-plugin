@@ -51,8 +51,7 @@ public class MessageFactory {
      * Builds a server-wide broadcast message with a reaction count.
      * <p>
      * Format: {@code [LIKE] senderName → targetName  "reasonText"  [♡N]}
-     * Pass {@code -1} for {@code reactionCount} to omit the count (uses
-     * {@code likes.broadcast.react.plain} key instead).
+     * Pass {@code -1} for {@code reactionCount} to omit the count.
      * </p>
      *
      * @param broadcast     the broadcast data
@@ -64,24 +63,53 @@ public class MessageFactory {
      */
     public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName,
             int reactionCount) {
+        return buildBroadcastMessage(broadcast, senderName, targetName, reactionCount, false);
+    }
+
+    /**
+     * Builds a server-wide broadcast message with a reaction count and
+     * already-reacted state.
+     * <p>
+     * When {@code alreadyReacted} is {@code true} the react button shows
+     * {@code ♥} instead of {@code ♡} and the {@code UNDERLINED} decoration is
+     * omitted.
+     * </p>
+     *
+     * @param broadcast      the broadcast data
+     * @param senderName     the sender's display name
+     * @param targetName     the target player's display name
+     * @param reactionCount  total number of reactions, or {@code -1} to show no
+     *                       count
+     * @param alreadyReacted whether the viewing player has already reacted
+     * @return the assembled {@link Component}
+     */
+    public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName,
+            int reactionCount, boolean alreadyReacted) {
         String shortId = broadcast.shortId();
 
-        Component reactButton = (reactionCount < 0
-                ? Component.translatable("likes.broadcast.react.plain")
-                : Component.translatable("likes.broadcast.react", Component.text(reactionCount)))
-                .color(NamedTextColor.RED)
-                .decorate(TextDecoration.UNDERLINED)
-                .clickEvent(ClickEvent.runCommand("/likeboost " + shortId))
-                .hoverEvent(HoverEvent.showText(
-                        Component.translatable("likes.broadcast.react.hover")
-                                .append(Component.text("\nID: "))
-                                .append(Component.text(shortId).color(NamedTextColor.YELLOW))));
+        String heart = alreadyReacted ? "♥" : "♡";
+        String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
+        Component reactLabel = Component.text("[" + heart + count + "]");
+
+        Component reactButton = reactLabel
+                .color(NamedTextColor.RED);
+
+        if (!alreadyReacted) {
+            reactButton = reactButton
+                    .color(NamedTextColor.GRAY)
+                    .decorate(TextDecoration.UNDERLINED)
+                    .clickEvent(ClickEvent.runCommand("/likeboost " + shortId))
+                    .hoverEvent(HoverEvent.showText(
+                            Component.translatable("likes.broadcast.react.hover")
+                                    .append(Component.text("\nID: "))
+                                    .append(Component.text(shortId).color(NamedTextColor.YELLOW))));
+        }
 
         return Component.text(prefix)
                 .color(NamedTextColor.AQUA)
                 .append(Component.text(" "))
                 .append(Component.text(senderName).color(NamedTextColor.WHITE))
-                .append(Component.text(" → ").color(NamedTextColor.GRAY))
+                .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
                 .append(Component.text(targetName).color(NamedTextColor.WHITE))
                 .append(Component.text("  \"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY))
                 .append(Component.text("  "))

@@ -91,12 +91,14 @@ public class LikesCommand implements CommandExecutor {
             String senderName = resolveName(broadcast.sourceSenderUuid());
             String targetName = resolveName(broadcast.targetUuid());
             int count = 0;
+            boolean alreadyReacted = false;
             try {
                 count = eventRepository.countByBroadcastId(broadcast.broadcastId());
+                alreadyReacted = eventRepository.exists(broadcast.broadcastId(), player.getUniqueId());
             } catch (SQLException e) {
                 log.log(Level.WARNING, "Failed to get reaction count for broadcastId: " + broadcast.broadcastId(), e);
             }
-            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderName, targetName, count);
+            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderName, targetName, count, alreadyReacted);
             player.sendMessage(msg);
         }
 
