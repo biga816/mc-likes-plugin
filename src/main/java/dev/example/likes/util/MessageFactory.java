@@ -98,7 +98,7 @@ public class MessageFactory {
             reactButton = reactButton
                     .color(NamedTextColor.GRAY)
                     .decorate(TextDecoration.UNDERLINED)
-                    .clickEvent(ClickEvent.runCommand("/likeboost " + shortId))
+                    .clickEvent(ClickEvent.runCommand("/like boost " + shortId))
                     .hoverEvent(HoverEvent.showText(
                             Component.translatable("likes.broadcast.react.hover")
                                     .append(Component.text("\nID: "))

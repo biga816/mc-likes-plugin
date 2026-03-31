@@ -1,8 +1,6 @@
 package dev.example.likes;
 
-import dev.example.likes.command.LikeBoostCommand;
 import dev.example.likes.command.LikeCommand;
-import dev.example.likes.command.LikesCommand;
 import dev.example.likes.database.BroadcastRepository;
 import dev.example.likes.database.DailyLimitRepository;
 import dev.example.likes.database.DatabaseManager;
@@ -77,11 +75,9 @@ public class LikesPlugin extends JavaPlugin {
                 getConfig(), this);
 
         // 5. Register commands
-        LikeCommand likeCommand = new LikeCommand(likeService, messageFactory);
+        LikeCommand likeCommand = new LikeCommand(likeService, recentService, eventRepo, messageFactory);
         getCommand("like").setExecutor(likeCommand);
         getCommand("like").setTabCompleter(likeCommand);
-        getCommand("likeboost").setExecutor(new LikeBoostCommand(likeService, messageFactory));
-        getCommand("likes").setExecutor(new LikesCommand(recentService, eventRepo, messageFactory));
 
         getLogger().info("Likes enabled!");
     }
