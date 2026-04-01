@@ -211,8 +211,10 @@ public class LikeService {
                         Stream.of(Bukkit.getConsoleSender())).collect(java.util.stream.Collectors.toList()));
         others.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderName, targetName));
 
-        // 13. Send personal notification to the target
-        target.sendMessage(messageFactory.buildTargetNotification(broadcast, senderName));
+        // 13. Send broadcast to the target with "you" label and no react button
+        Component senderDisplay = Component.text(senderName).color(NamedTextColor.WHITE);
+        Component youDisplay = Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN);
+        target.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderDisplay, youDisplay, -1, false, false));
     }
 
     /**

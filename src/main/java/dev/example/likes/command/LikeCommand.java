@@ -6,6 +6,7 @@ import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
 import dev.example.likes.util.MessageFactory;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -101,8 +102,14 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
 
         player.sendMessage(messageFactory.info("likes.recent.title"));
         for (LikesBroadcast broadcast : recent) {
-            String senderName = resolveName(broadcast.sourceSenderUuid());
-            String targetName = resolveName(broadcast.targetUuid());
+            boolean isOwnSend = broadcast.sourceSenderUuid().equals(player.getUniqueId());
+            Component senderDisplay = isOwnSend
+                    ? Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN)
+                    : Component.text(resolveName(broadcast.sourceSenderUuid())).color(NamedTextColor.WHITE);
+            boolean isOwnLike = broadcast.targetUuid().equals(player.getUniqueId());
+            Component targetDisplay = isOwnLike
+                    ? Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN)
+                    : Component.text(resolveName(broadcast.targetUuid())).color(NamedTextColor.WHITE);
             int count = 0;
             boolean alreadyReacted = false;
             try {
@@ -111,7 +118,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             } catch (SQLException e) {
                 log.log(Level.WARNING, "Failed to get reaction count for broadcastId: " + broadcast.broadcastId(), e);
             }
-            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderName, targetName, count, alreadyReacted);
+            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count, alreadyReacted, !isOwnLike);
             player.sendMessage(msg);
         }
 

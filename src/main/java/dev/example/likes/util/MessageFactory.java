@@ -85,14 +85,50 @@ public class MessageFactory {
      */
     public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName,
             int reactionCount, boolean alreadyReacted) {
+        return buildBroadcastMessage(broadcast,
+                Component.text(senderName).color(NamedTextColor.WHITE),
+                Component.text(targetName).color(NamedTextColor.WHITE),
+                reactionCount, alreadyReacted, true);
+    }
+
+    /**
+     * Builds a server-wide broadcast message with full control over sender/target
+     * display components and react button visibility.
+     * <p>
+     * Pass a {@link Component#translatable(String)} as {@code senderDisplay} or
+     * {@code targetDisplay} to show a localized label (e.g. "あなた / you").
+     * Set {@code showReactButton} to {@code false} to suppress the button
+     * (used when sending to the target player themselves).
+     * </p>
+     *
+     * @param broadcast       the broadcast data
+     * @param senderDisplay   pre-built component for the sender name slot
+     * @param targetDisplay   pre-built component for the target name slot
+     * @param reactionCount   total number of reactions, or {@code -1} to show no
+     *                        count
+     * @param alreadyReacted  whether the viewing player has already reacted
+     * @param showReactButton whether to append the react button
+     * @return the assembled {@link Component}
+     */
+    public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay,
+            int reactionCount, boolean alreadyReacted, boolean showReactButton) {
         String shortId = broadcast.shortId();
+
+        Component message = Component.text(prefix)
+                .color(NamedTextColor.AQUA)
+                .append(Component.text(" "))
+                .append(senderDisplay)
+                .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
+                .append(targetDisplay)
+                .append(Component.text("  \"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
+
+        if (!showReactButton) {
+            return message;
+        }
 
         String heart = alreadyReacted ? "♥" : "♡";
         String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
-        Component reactLabel = Component.text("[" + heart + count + "]");
-
-        Component reactButton = reactLabel
-                .color(NamedTextColor.RED);
+        Component reactButton = Component.text("[" + heart + count + "]");
 
         if (!alreadyReacted) {
             reactButton = reactButton
@@ -103,40 +139,11 @@ public class MessageFactory {
                             Component.translatable("likes.broadcast.react.hover")
                                     .append(Component.text("\nID: "))
                                     .append(Component.text(shortId).color(NamedTextColor.YELLOW))));
+        } else {
+            reactButton = reactButton.color(NamedTextColor.RED);
         }
 
-        return Component.text(prefix)
-                .color(NamedTextColor.AQUA)
-                .append(Component.text(" "))
-                .append(Component.text(senderName).color(NamedTextColor.WHITE))
-                .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
-                .append(Component.text(targetName).color(NamedTextColor.WHITE))
-                .append(Component.text("  \"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY))
-                .append(Component.text("  "))
-                .append(reactButton);
-    }
-
-    /**
-     * Builds a personal notification message for the target player.
-     * <p>
-     * Uses the {@code likes.notification.body} translation key with the sender's
-     * name
-     * and reason as arguments, allowing per-player locale rendering.
-     * </p>
-     *
-     * @param broadcast  the broadcast data
-     * @param senderName the sender's display name
-     * @return the assembled {@link Component}
-     */
-    public Component buildTargetNotification(LikesBroadcast broadcast, String senderName) {
-        return Component.text(prefix)
-                .color(NamedTextColor.AQUA)
-                .append(Component.text(" "))
-                .append(Component.translatable(
-                        "likes.notification.body",
-                        Component.text(senderName).color(NamedTextColor.WHITE),
-                        Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY))
-                        .color(NamedTextColor.GRAY));
+        return message.append(Component.text("  ")).append(reactButton);
     }
 
     /**
