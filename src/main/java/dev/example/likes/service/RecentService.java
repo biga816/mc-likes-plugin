@@ -71,16 +71,19 @@ public class RecentService {
     }
 
     /**
-     * Returns up to N recent broadcasts in created_at DESC order (newest first).
+     * Returns up to N recent broadcasts in created_at ASC order (oldest first).
      *
      * @param limit maximum number of entries to return
-     * @return list of broadcasts, newest first
+     * @return list of broadcasts, oldest first
      */
     public synchronized List<LikesBroadcast> getRecent(int limit) {
-        // Buffer is stored ascending; reverse to return newest first
-        List<LikesBroadcast> all = new ArrayList<>(recentBuffer);
-        Collections.reverse(all);
-        return all.stream().limit(limit).toList();
+        List<LikesBroadcast> result = new ArrayList<>(limit);
+        Iterator<LikesBroadcast> it = recentBuffer.descendingIterator();
+        for (int i = 0; i < limit && it.hasNext(); i++) {
+            result.add(it.next());
+        }
+        Collections.reverse(result);
+        return result;
     }
 
     /**
