@@ -112,7 +112,7 @@ public class MessageFactory {
      */
     public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay,
             int reactionCount, boolean alreadyReacted, boolean showReactButton) {
-        String shortId = broadcast.shortId();
+        String displayCode = broadcast.displayCode();
 
         Component message = Component.text(prefix)
                 .color(NamedTextColor.AQUA)
@@ -134,16 +134,18 @@ public class MessageFactory {
             reactButton = reactButton
                     .color(NamedTextColor.GRAY)
                     .decorate(TextDecoration.UNDERLINED)
-                    .clickEvent(ClickEvent.runCommand("/like boost " + shortId))
+                    .clickEvent(ClickEvent.runCommand("/like boost " + displayCode))
                     .hoverEvent(HoverEvent.showText(
                             Component.translatable("likes.broadcast.react.hover")
                                     .append(Component.text("\nID: "))
-                                    .append(Component.text(shortId).color(NamedTextColor.YELLOW))));
+                                    .append(Component.text(displayCode).color(NamedTextColor.AQUA))));
         } else {
             reactButton = reactButton.color(NamedTextColor.RED);
         }
 
-        return message.append(Component.text("  ")).append(reactButton);
+        Component codeLabel = Component.text("(" + displayCode + ")").color(NamedTextColor.DARK_AQUA)
+                .decorate(TextDecoration.ITALIC);
+        return message.append(Component.text("  ")).append(reactButton).append(Component.text("  ")).append(codeLabel);
     }
 
     /**

@@ -10,7 +10,7 @@ import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
 import dev.example.likes.util.I18nService;
 import dev.example.likes.util.MessageFactory;
-import dev.example.likes.util.ShortIdGenerator;
+import dev.example.likes.util.DisplayCodeGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.SQLException;
@@ -66,12 +66,12 @@ public class LikesPlugin extends JavaPlugin {
             return;
         }
 
-        ShortIdGenerator shortIdGen = new ShortIdGenerator(broadcastRepo);
+        DisplayCodeGenerator displayCodeGen = new DisplayCodeGenerator(broadcastRepo);
         MessageFactory messageFactory = new MessageFactory(getConfig());
 
         LikeService likeService = new LikeService(
                 broadcastRepo, eventRepo, dailyRepo,
-                shortIdGen, cooldownService, recentService, messageFactory,
+                displayCodeGen, cooldownService, recentService, messageFactory,
                 getConfig(), this);
 
         // 5. Register commands

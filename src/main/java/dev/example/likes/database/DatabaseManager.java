@@ -49,7 +49,7 @@ public class DatabaseManager {
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_broadcasts (
                         broadcast_id TEXT PRIMARY KEY,
-                        short_id TEXT UNIQUE NOT NULL,
+                        display_code TEXT NOT NULL,
                         created_at INTEGER NOT NULL,
                         source_type TEXT NOT NULL,
                         source_sender_uuid TEXT NOT NULL,

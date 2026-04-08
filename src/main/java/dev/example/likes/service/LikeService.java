@@ -5,8 +5,8 @@ import dev.example.likes.database.DailyLimitRepository;
 import dev.example.likes.database.EventRepository;
 import dev.example.likes.model.LikesBroadcast;
 import dev.example.likes.model.LikesEvent;
+import dev.example.likes.util.DisplayCodeGenerator;
 import dev.example.likes.util.MessageFactory;
-import dev.example.likes.util.ShortIdGenerator;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -33,7 +33,7 @@ public class LikeService {
     private final BroadcastRepository broadcastRepository;
     private final EventRepository eventRepository;
     private final DailyLimitRepository dailyLimitRepository;
-    private final ShortIdGenerator shortIdGenerator;
+    private final DisplayCodeGenerator displayCodeGenerator;
     private final CooldownService cooldownService;
     private final RecentService recentService;
     private final MessageFactory messageFactory;
@@ -47,7 +47,7 @@ public class LikeService {
      * @param broadcastRepository  broadcast repository
      * @param eventRepository      event repository
      * @param dailyLimitRepository daily limit repository
-     * @param shortIdGenerator     short ID generator
+     * @param displayCodeGenerator display code generator
      * @param cooldownService      cooldown service
      * @param recentService        recent broadcast service
      * @param messageFactory       message factory
@@ -58,7 +58,7 @@ public class LikeService {
             BroadcastRepository broadcastRepository,
             EventRepository eventRepository,
             DailyLimitRepository dailyLimitRepository,
-            ShortIdGenerator shortIdGenerator,
+            DisplayCodeGenerator displayCodeGenerator,
             CooldownService cooldownService,
             RecentService recentService,
             MessageFactory messageFactory,
@@ -67,7 +67,7 @@ public class LikeService {
         this.broadcastRepository = broadcastRepository;
         this.eventRepository = eventRepository;
         this.dailyLimitRepository = dailyLimitRepository;
-        this.shortIdGenerator = shortIdGenerator;
+        this.displayCodeGenerator = displayCodeGenerator;
         this.cooldownService = cooldownService;
         this.recentService = recentService;
         this.messageFactory = messageFactory;
@@ -132,12 +132,12 @@ public class LikeService {
             return;
         }
 
-        // 5. Generate shortId
-        String shortId;
+        // 5. Generate displayCode
+        String displayCode;
         try {
-            shortId = shortIdGenerator.generateUnique();
+            displayCode = displayCodeGenerator.generateUnique();
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to generate unique shortId", e);
+            log.log(Level.SEVERE, "Failed to generate unique displayCode", e);
             sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
@@ -147,7 +147,7 @@ public class LikeService {
         long now = System.currentTimeMillis();
         LikesBroadcast broadcast = new LikesBroadcast(
                 broadcastId,
-                shortId,
+                displayCode,
                 now,
                 "DIRECT",
                 sender.getUniqueId(),
@@ -218,39 +218,77 @@ public class LikeService {
     }
 
     /**
-     * Sends a reaction (like) to the broadcast identified by the given shortId.
+     * Sends a reaction to the broadcast identified by the given displayCode.
      * <p>
-     * Sends an error message to the sender and returns early if the broadcast does
-     * not exist
-     * or if the sender has already reacted.
+     * Resolves to the most recent broadcast matching the code. Sends an error
+     * message and returns early if no matching broadcast exists.
      * </p>
      *
-     * @param sender  the player sending the reaction
-     * @param shortId the shortId of the target broadcast
+     * @param sender      the player sending the reaction
+     * @param displayCode the 4-character display code of the target broadcast
      */
-    public void react(Player sender, String shortId) {
-        // 1. Look up the broadcast by shortId
+    public void react(Player sender, String displayCode) {
         LikesBroadcast broadcast;
         try {
-            var optBroadcast = broadcastRepository.findByShortId(shortId);
+            var optBroadcast = broadcastRepository.findLatestByDisplayCode(displayCode);
             if (optBroadcast.isEmpty()) {
-                sender.sendMessage(messageFactory.error("likes.error.not-found", Component.text(shortId)));
+                sender.sendMessage(messageFactory.error("likes.error.not-found", Component.text(displayCode)));
                 return;
             }
             broadcast = optBroadcast.get();
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to find broadcast by shortId: " + shortId, e);
+            log.log(Level.SEVERE, "Failed to find broadcast by displayCode: " + displayCode, e);
             sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
-        // 2. Disallow self-react
+        reactToBroadcast(sender, broadcast);
+    }
+
+    /**
+     * Sends a reaction to the broadcast the player last saw.
+     * <p>
+     * Retrieves the broadcast directly from the in-memory recent buffer via
+     * {@link RecentService#getLastSeenBroadcastId(UUID)}.
+     * Sends an error message and returns early if no lastSeen entry exists.
+     * </p>
+     *
+     * @param sender the player sending the reaction
+     */
+    public void react(Player sender) {
+        var optBroadcastId = recentService.getLastSeenBroadcastId(sender.getUniqueId());
+        if (optBroadcastId.isEmpty()) {
+            sender.sendMessage(messageFactory.error("likes.error.no-recent"));
+            return;
+        }
+
+        String broadcastId = optBroadcastId.get();
+        var recentList = recentService.getRecent(Integer.MAX_VALUE);
+        var optBroadcast = recentList.stream()
+                .filter(b -> b.broadcastId().equals(broadcastId))
+                .findFirst();
+        if (optBroadcast.isEmpty()) {
+            sender.sendMessage(messageFactory.error("likes.error.no-recent"));
+            return;
+        }
+
+        reactToBroadcast(sender, optBroadcast.get());
+    }
+
+    /**
+     * Performs the reaction logic for a resolved broadcast.
+     *
+     * @param sender    the player sending the reaction
+     * @param broadcast the target broadcast
+     */
+    private void reactToBroadcast(Player sender, LikesBroadcast broadcast) {
+        // 1. Disallow self-react
         if (sender.getUniqueId().equals(broadcast.targetUuid())) {
             sender.sendMessage(messageFactory.error("likes.error.self"));
             return;
         }
 
-        // 3. Check for duplicate reaction
+        // 2. Check for duplicate reaction
         try {
             if (eventRepository.exists(broadcast.broadcastId(), sender.getUniqueId())) {
                 sender.sendMessage(messageFactory.error("likes.error.already-reacted"));
@@ -287,51 +325,5 @@ public class LikeService {
 
         // 5. Update lastSeen
         recentService.updateLastSeen(sender.getUniqueId(), broadcast.broadcastId());
-    }
-
-    /**
-     * Sends a reaction to the broadcast the player last saw.
-     * <p>
-     * Retrieves the broadcastId via
-     * {@link RecentService#getLastSeenBroadcastId(UUID)}
-     * and delegates to {@link #react(Player, String)}.
-     * Sends an error message and returns early if no lastSeen entry exists.
-     * </p>
-     *
-     * @param sender the player sending the reaction
-     */
-    public void react(Player sender) {
-        // 1. Retrieve lastSeenBroadcastId
-        var optShortId = recentService.getLastSeenBroadcastId(sender.getUniqueId());
-        if (optShortId.isEmpty()) {
-            sender.sendMessage(messageFactory.error("likes.error.no-recent"));
-            return;
-        }
-
-        // lastSeenBroadcastId stores the broadcastId; resolve the shortId by looking up
-        // the broadcast from the in-memory buffer before delegating to react(sender,
-        // shortId)
-        String broadcastId = optShortId.get();
-        String shortId;
-        try {
-            // No direct findByBroadcastId method exists; search the in-memory recent buffer
-            // instead
-            var recentList = recentService.getRecent(Integer.MAX_VALUE);
-            var optBroadcast = recentList.stream()
-                    .filter(b -> b.broadcastId().equals(broadcastId))
-                    .findFirst();
-            if (optBroadcast.isEmpty()) {
-                sender.sendMessage(messageFactory.error("likes.error.no-recent"));
-                return;
-            }
-            shortId = optBroadcast.get().shortId();
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to find broadcast from recent buffer: " + broadcastId, e);
-            sender.sendMessage(messageFactory.error("likes.error.internal"));
-            return;
-        }
-
-        // 2. Delegate to react(sender, shortId)
-        react(sender, shortId);
     }
 }

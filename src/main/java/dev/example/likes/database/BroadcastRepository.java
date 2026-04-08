@@ -36,13 +36,13 @@ public class BroadcastRepository {
     public void save(LikesBroadcast broadcast) throws SQLException {
         String sql = """
                 INSERT INTO likes_broadcasts
-                    (broadcast_id, short_id, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
+                    (broadcast_id, display_code, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, broadcast.broadcastId());
-            ps.setString(2, broadcast.shortId());
+            ps.setString(2, broadcast.displayCode());
             ps.setLong(3, broadcast.createdAt());
             ps.setString(4, broadcast.sourceType());
             ps.setString(5, broadcast.sourceSenderUuid().toString());
@@ -54,17 +54,17 @@ public class BroadcastRepository {
     }
 
     /**
-     * Finds a broadcast by its shortId.
+     * Finds the most recent broadcast matching the given displayCode.
      *
-     * @param shortId the shortId to search for
-     * @return an Optional containing the broadcast if found, or empty if not
+     * @param displayCode the display code to search for
+     * @return an Optional containing the most recent matching broadcast, or empty if not found
      * @throws SQLException if a database operation fails
      */
-    public Optional<LikesBroadcast> findByShortId(String shortId) throws SQLException {
-        String sql = "SELECT * FROM likes_broadcasts WHERE short_id = ?";
+    public Optional<LikesBroadcast> findLatestByDisplayCode(String displayCode) throws SQLException {
+        String sql = "SELECT * FROM likes_broadcasts WHERE display_code = ? ORDER BY created_at DESC LIMIT 1";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, shortId);
+            ps.setString(1, displayCode);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(mapRow(rs));
@@ -97,17 +97,28 @@ public class BroadcastRepository {
     }
 
     /**
-     * Checks whether a broadcast with the given shortId exists.
+     * Checks whether a broadcast with the given displayCode exists within the most
+     * recent {@code recentWindow} broadcasts. Used for collision detection during code
+     * generation.
      *
-     * @param shortId the shortId to check
-     * @return true if a matching broadcast exists
+     * @param displayCode  the display code to check
+     * @param recentWindow number of most recent broadcasts to search within
+     * @return true if a matching broadcast exists in the recent window
      * @throws SQLException if a database operation fails
      */
-    public boolean existsByShortId(String shortId) throws SQLException {
-        String sql = "SELECT 1 FROM likes_broadcasts WHERE short_id = ? LIMIT 1";
+    public boolean existsInRecentByDisplayCode(String displayCode, int recentWindow) throws SQLException {
+        String sql = """
+                SELECT 1 FROM likes_broadcasts
+                WHERE display_code = ?
+                AND broadcast_id IN (
+                    SELECT broadcast_id FROM likes_broadcasts ORDER BY created_at DESC LIMIT ?
+                )
+                LIMIT 1
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, shortId);
+            ps.setString(1, displayCode);
+            ps.setInt(2, recentWindow);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
@@ -124,7 +135,7 @@ public class BroadcastRepository {
     private LikesBroadcast mapRow(ResultSet rs) throws SQLException {
         return new LikesBroadcast(
                 rs.getString("broadcast_id"),
-                rs.getString("short_id"),
+                rs.getString("display_code"),
                 rs.getLong("created_at"),
                 rs.getString("source_type"),
                 UUID.fromString(rs.getString("source_sender_uuid")),

@@ -8,7 +8,7 @@ import java.util.UUID;
  */
 public record LikesBroadcast(
         String broadcastId,
-        String shortId,
+        String displayCode,
         long createdAt,
         String sourceType,
         UUID sourceSenderUuid,
