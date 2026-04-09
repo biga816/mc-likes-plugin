@@ -118,7 +118,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             } catch (SQLException e) {
                 log.log(Level.WARNING, "Failed to get reaction count for broadcastId: " + broadcast.broadcastId(), e);
             }
-            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count, alreadyReacted, !isOwnLike);
+            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count, alreadyReacted, true, !isOwnLike);
             player.sendMessage(msg);
         }
 

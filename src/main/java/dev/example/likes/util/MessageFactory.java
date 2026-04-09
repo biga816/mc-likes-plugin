@@ -112,6 +112,32 @@ public class MessageFactory {
      */
     public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay,
             int reactionCount, boolean alreadyReacted, boolean showReactButton) {
+        return buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, reactionCount, alreadyReacted,
+                showReactButton, true);
+    }
+
+    /**
+     * Builds a server-wide broadcast message with full control over sender/target
+     * display components, react button visibility, and click interactivity.
+     * <p>
+     * When {@code clickable} is {@code false} and the player has not yet reacted,
+     * the react button is shown as {@code ♡} without underline or click event
+     * (used when the viewing player is the like target and cannot react).
+     * </p>
+     *
+     * @param broadcast       the broadcast data
+     * @param senderDisplay   pre-built component for the sender name slot
+     * @param targetDisplay   pre-built component for the target name slot
+     * @param reactionCount   total number of reactions, or {@code -1} to show no
+     *                        count
+     * @param alreadyReacted  whether the viewing player has already reacted
+     * @param showReactButton whether to append the react button
+     * @param clickable       whether the react button should have a click event and
+     *                        underline decoration
+     * @return the assembled {@link Component}
+     */
+    public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay,
+            int reactionCount, boolean alreadyReacted, boolean showReactButton, boolean clickable) {
         String displayCode = broadcast.displayCode();
 
         Component message = Component.text(prefix)
@@ -128,9 +154,13 @@ public class MessageFactory {
 
         String heart = alreadyReacted ? "♥" : "♡";
         String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
-        Component reactButton = Component.text("[" + heart + count + "]");
+        Component reactButton = Component.text("[" + heart + count + "]").color(NamedTextColor.GRAY);
+        Component codeLabel = Component.text("(" + displayCode + ")").color(NamedTextColor.DARK_GRAY)
+                .decorate(TextDecoration.ITALIC);
 
-        if (!alreadyReacted) {
+        if (alreadyReacted) {
+            reactButton = reactButton.color(NamedTextColor.RED);
+        } else if (clickable) {
             reactButton = reactButton
                     .color(NamedTextColor.GRAY)
                     .decorate(TextDecoration.UNDERLINED)
@@ -139,12 +169,9 @@ public class MessageFactory {
                             Component.translatable("likes.broadcast.react.hover")
                                     .append(Component.text("\nID: "))
                                     .append(Component.text(displayCode).color(NamedTextColor.AQUA))));
-        } else {
-            reactButton = reactButton.color(NamedTextColor.RED);
+            codeLabel = codeLabel.color(NamedTextColor.DARK_AQUA);
         }
 
-        Component codeLabel = Component.text("(" + displayCode + ")").color(NamedTextColor.DARK_AQUA)
-                .decorate(TextDecoration.ITALIC);
         return message.append(Component.text("  ")).append(reactButton).append(Component.text("  ")).append(codeLabel);
     }
 
