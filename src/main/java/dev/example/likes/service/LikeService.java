@@ -202,19 +202,19 @@ public class LikeService {
                 Component.text(reason).color(NamedTextColor.GRAY)));
 
         // 12. Broadcast to all players except sender and target, plus console
-        String senderName = sender.getName();
+        Component senderDisplay = Component.text(sender.getName()).color(NamedTextColor.WHITE);
+        Component targetDisplay = Component.text(targetName).color(NamedTextColor.WHITE);
         Audience others = Audience.audience(
                 Stream.concat(
                         Bukkit.getOnlinePlayers().stream()
                                 .filter(p -> !p.getUniqueId().equals(target.getUniqueId())
                                         && !p.getUniqueId().equals(sender.getUniqueId())),
                         Stream.of(Bukkit.getConsoleSender())).collect(java.util.stream.Collectors.toList()));
-        others.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderName, targetName));
+        others.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, -1, false, true, true));
 
         // 13. Send broadcast to the target with "you" label and no react button
-        Component senderDisplay = Component.text(senderName).color(NamedTextColor.WHITE);
         Component youDisplay = Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN);
-        target.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderDisplay, youDisplay, -1, false, false));
+        target.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderDisplay, youDisplay));
     }
 
     /**

@@ -33,87 +33,19 @@ public class MessageFactory {
     }
 
     /**
-     * Builds a server-wide broadcast message for a newly created like.
+     * Builds the simplest broadcast message: no reaction count, no react button.
      * <p>
-     * Format: {@code [LIKE] senderName → targetName  "reasonText"  [♡]}
-     * </p>
-     *
-     * @param broadcast  the broadcast data
-     * @param senderName the sender's display name
-     * @param targetName the target player's display name
-     * @return the assembled {@link Component}
-     */
-    public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName) {
-        return buildBroadcastMessage(broadcast, senderName, targetName, -1);
-    }
-
-    /**
-     * Builds a server-wide broadcast message with a reaction count.
-     * <p>
-     * Format: {@code [LIKE] senderName → targetName  "reasonText"  [♡N]}
-     * Pass {@code -1} for {@code reactionCount} to omit the count.
+     * Use {@link #buildBroadcastMessage(LikesBroadcast, Component, Component, int, boolean, boolean, boolean)}
+     * for full control over reaction count and button behavior.
      * </p>
      *
      * @param broadcast     the broadcast data
-     * @param senderName    the sender's display name
-     * @param targetName    the target player's display name
-     * @param reactionCount total number of reactions, or {@code -1} to show no
-     *                      count
+     * @param senderDisplay pre-built component for the sender name slot
+     * @param targetDisplay pre-built component for the target name slot
      * @return the assembled {@link Component}
      */
-    public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName,
-            int reactionCount) {
-        return buildBroadcastMessage(broadcast, senderName, targetName, reactionCount, false);
-    }
-
-    /**
-     * Builds a server-wide broadcast message with a reaction count and
-     * already-reacted state.
-     * <p>
-     * When {@code alreadyReacted} is {@code true} the react button shows
-     * {@code ♥} instead of {@code ♡} and the {@code UNDERLINED} decoration is
-     * omitted.
-     * </p>
-     *
-     * @param broadcast      the broadcast data
-     * @param senderName     the sender's display name
-     * @param targetName     the target player's display name
-     * @param reactionCount  total number of reactions, or {@code -1} to show no
-     *                       count
-     * @param alreadyReacted whether the viewing player has already reacted
-     * @return the assembled {@link Component}
-     */
-    public Component buildBroadcastMessage(LikesBroadcast broadcast, String senderName, String targetName,
-            int reactionCount, boolean alreadyReacted) {
-        return buildBroadcastMessage(broadcast,
-                Component.text(senderName).color(NamedTextColor.WHITE),
-                Component.text(targetName).color(NamedTextColor.WHITE),
-                reactionCount, alreadyReacted, true);
-    }
-
-    /**
-     * Builds a server-wide broadcast message with full control over sender/target
-     * display components and react button visibility.
-     * <p>
-     * Pass a {@link Component#translatable(String)} as {@code senderDisplay} or
-     * {@code targetDisplay} to show a localized label (e.g. "あなた / you").
-     * Set {@code showReactButton} to {@code false} to suppress the button
-     * (used when sending to the target player themselves).
-     * </p>
-     *
-     * @param broadcast       the broadcast data
-     * @param senderDisplay   pre-built component for the sender name slot
-     * @param targetDisplay   pre-built component for the target name slot
-     * @param reactionCount   total number of reactions, or {@code -1} to show no
-     *                        count
-     * @param alreadyReacted  whether the viewing player has already reacted
-     * @param showReactButton whether to append the react button
-     * @return the assembled {@link Component}
-     */
-    public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay,
-            int reactionCount, boolean alreadyReacted, boolean showReactButton) {
-        return buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, reactionCount, alreadyReacted,
-                showReactButton, true);
+    public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay) {
+        return buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, -1, false, false, false);
     }
 
     /**
