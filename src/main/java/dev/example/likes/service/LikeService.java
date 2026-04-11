@@ -263,10 +263,7 @@ public class LikeService {
         }
 
         String broadcastId = optBroadcastId.get();
-        var recentList = recentService.getRecent(Integer.MAX_VALUE);
-        var optBroadcast = recentList.stream()
-                .filter(b -> b.broadcastId().equals(broadcastId))
-                .findFirst();
+        var optBroadcast = recentService.findById(broadcastId);
         if (optBroadcast.isEmpty()) {
             sender.sendMessage(messageFactory.error("likes.error.no-recent"));
             return;

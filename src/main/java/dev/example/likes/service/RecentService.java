@@ -106,4 +106,16 @@ public class RecentService {
     public Optional<String> getLastSeenBroadcastId(UUID playerUuid) {
         return Optional.ofNullable(lastSeenBroadcastId.get(playerUuid));
     }
+
+    /**
+     * Returns the broadcast with the given ID from the in-memory buffer.
+     *
+     * @param broadcastId the broadcast ID to look up
+     * @return an Optional containing the matching broadcast, or empty if not found
+     */
+    public synchronized Optional<LikesBroadcast> findById(String broadcastId) {
+        return recentBuffer.stream()
+                .filter(b -> b.broadcastId().equals(broadcastId))
+                .findFirst();
+    }
 }
