@@ -210,7 +210,8 @@ public class LikeService {
                                 .filter(p -> !p.getUniqueId().equals(target.getUniqueId())
                                         && !p.getUniqueId().equals(sender.getUniqueId())),
                         Stream.of(Bukkit.getConsoleSender())).collect(java.util.stream.Collectors.toList()));
-        others.sendMessage(messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, -1, false, true, true));
+        others.sendMessage(
+                messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, -1, false, true, true));
 
         // 13. Send broadcast to the target with "you" label and no react button
         Component youDisplay = Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN);
@@ -272,6 +273,14 @@ public class LikeService {
         reactToBroadcast(sender, optBroadcast.get());
     }
 
+    private String resolvePlayerName(UUID uuid) {
+        Player online = Bukkit.getPlayer(uuid);
+        if (online != null)
+            return online.getName();
+        String name = Bukkit.getOfflinePlayer(uuid).getName();
+        return name != null ? name : uuid.toString();
+    }
+
     /**
      * Performs the reaction logic for a resolved broadcast.
      *
@@ -286,9 +295,11 @@ public class LikeService {
         }
 
         // 2. Check for duplicate reaction
+        String displayCode = broadcast.displayCode();
+        Component displayCodeComponent = Component.text("(" + displayCode + ")").color(NamedTextColor.WHITE);
         try {
             if (eventRepository.exists(broadcast.broadcastId(), sender.getUniqueId())) {
-                sender.sendMessage(messageFactory.error("likes.error.already-reacted"));
+                sender.sendMessage(messageFactory.error("likes.error.already-reacted", displayCodeComponent));
                 return;
             }
         } catch (SQLException e) {
@@ -309,7 +320,7 @@ public class LikeService {
         try {
             eventRepository.save(event);
         } catch (SQLIntegrityConstraintViolationException e) {
-            sender.sendMessage(messageFactory.error("likes.error.already-reacted"));
+            sender.sendMessage(messageFactory.error("likes.error.already-reacted", displayCodeComponent));
             return;
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to save react event for broadcastId: " + broadcast.broadcastId(), e);
@@ -318,7 +329,10 @@ public class LikeService {
         }
 
         // 4. Send success message
-        sender.sendMessage(messageFactory.success("likes.likeboost.success"));
+        String targetName = resolvePlayerName(broadcast.targetUuid());
+        Component targetNameComponent = Component.text(targetName).color(NamedTextColor.WHITE);
+        sender.sendMessage(
+                messageFactory.success("likes.likeboost.success", targetNameComponent, displayCodeComponent));
 
         // 5. Update lastSeen
         recentService.updateLastSeen(sender.getUniqueId(), broadcast.broadcastId());

@@ -35,7 +35,8 @@ public class MessageFactory {
     /**
      * Builds the simplest broadcast message: no reaction count, no react button.
      * <p>
-     * Use {@link #buildBroadcastMessage(LikesBroadcast, Component, Component, int, boolean, boolean, boolean)}
+     * Use
+     * {@link #buildBroadcastMessage(LikesBroadcast, Component, Component, int, boolean, boolean, boolean)}
      * for full control over reaction count and button behavior.
      * </p>
      *
@@ -100,8 +101,8 @@ public class MessageFactory {
                     .hoverEvent(HoverEvent.showText(
                             Component.translatable("likes.broadcast.react.hover")
                                     .append(Component.text("\nID: "))
-                                    .append(Component.text(displayCode).color(NamedTextColor.AQUA))));
-            codeLabel = codeLabel.color(NamedTextColor.DARK_AQUA);
+                                    .append(Component.text(displayCode).color(NamedTextColor.WHITE))));
+            codeLabel = codeLabel.color(NamedTextColor.WHITE);
         }
 
         return message.append(Component.text("  ")).append(reactButton).append(Component.text("  ")).append(codeLabel);
