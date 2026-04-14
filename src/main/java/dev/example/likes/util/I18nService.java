@@ -46,7 +46,7 @@ public class I18nService {
         loadAndRegister(classLoader, Locale.US, "messages_en_US.properties");
         loadAndRegister(classLoader, Locale.JAPAN, "messages_ja_JP.properties");
         // Register ROOT as an extra safety fallback (same content as en_US).
-        loadAndRegister(classLoader, Locale.ROOT, "messages.properties");
+        loadAndRegister(classLoader, Locale.ROOT, "messages_en_US.properties");
 
         GlobalTranslator.translator().addSource(registry);
     }

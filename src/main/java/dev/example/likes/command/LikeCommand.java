@@ -25,9 +25,9 @@ import java.util.logging.Logger;
  * Unified handler for the /like command.
  *
  * <ul>
- *   <li>{@code /like <player> <reason...>} — send a like</li>
- *   <li>{@code /like boost [shortId]}       — react to a broadcast</li>
- *   <li>{@code /like recent}                — show the 5 most recent likes</li>
+ * <li>{@code /like <player> <reason...>} — send a like</li>
+ * <li>{@code /like boost [displayCode]} — react to a broadcast</li>
+ * <li>{@code /like recent} — show the 5 most recent likes</li>
  * </ul>
  */
 public class LikeCommand implements CommandExecutor, TabCompleter {
@@ -55,7 +55,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            player.sendMessage(messageFactory.info("likes.command.like.usage"));
+            player.sendMessage(messageFactory.usageInfo("like", "boost", "recent"));
             return true;
         }
 
@@ -77,7 +77,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
 
         // /like <player> <reason...>
         if (args.length < 2) {
-            player.sendMessage(messageFactory.info("likes.command.like.usage"));
+            player.sendMessage(messageFactory.usageInfo("like"));
             return true;
         }
 
@@ -118,7 +118,8 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             } catch (SQLException e) {
                 log.log(Level.WARNING, "Failed to get reaction count for broadcastId: " + broadcast.broadcastId(), e);
             }
-            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count, alreadyReacted, true, !isOwnLike);
+            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count,
+                    alreadyReacted, true, !isOwnLike);
             player.sendMessage(msg);
         }
 

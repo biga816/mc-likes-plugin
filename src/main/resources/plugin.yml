@@ -6,7 +6,7 @@ description: "In-game likes and reactions for positive community vibes."
 
 commands:
   like:
-    usage: "/like <player> <reason...> | /like boost [shortId] | /like recent"
+    usage: "/like <player> <reason...> | /like boost [ID] | /like recent"
 
 permissions:
   likes.use:

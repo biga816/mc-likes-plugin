@@ -109,6 +109,23 @@ public class MessageFactory {
     }
 
     /**
+     * Builds a usage message component by combining the usage prefix with one or
+     * more usage keys, separated by " | ".
+     *
+     * @param usageKeys the translation keys for each usage entry
+     * @return a yellow {@link Component}
+     */
+    public Component usageInfo(String... usageKeys) {
+        Component msg = Component.translatable("likes.command.like.usage.prefix").color(NamedTextColor.YELLOW);
+        for (int i = 0; i < usageKeys.length; i++) {
+            msg = msg.append(Component.text(i == 0 ? " " : " | ").color(NamedTextColor.YELLOW))
+                    .append(Component.translatable("likes.command.like.usage." + usageKeys[i])
+                            .color(NamedTextColor.YELLOW));
+        }
+        return msg;
+    }
+
+    /**
      * Builds an error message component from a translation key.
      *
      * @param key  the translation key (e.g. {@code "likes.error.self"})
