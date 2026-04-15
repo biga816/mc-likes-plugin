@@ -17,7 +17,11 @@ import org.bukkit.entity.Player;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -100,6 +104,16 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        List<String> broadcastIds = recent.stream().map(LikesBroadcast::broadcastId).toList();
+        Map<String, Integer> countMap = new HashMap<>();
+        Set<String> reactedIds = new HashSet<>();
+        try {
+            countMap = eventRepository.countByBroadcastIds(broadcastIds);
+            reactedIds = eventRepository.reactedBroadcastIds(broadcastIds, player.getUniqueId());
+        } catch (SQLException e) {
+            log.log(Level.WARNING, "Failed to get reaction data for recent broadcasts", e);
+        }
+
         player.sendMessage(messageFactory.info("likes.recent.title"));
         for (LikesBroadcast broadcast : recent) {
             boolean isOwnSend = broadcast.sourceSenderUuid().equals(player.getUniqueId());
@@ -110,14 +124,8 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             Component targetDisplay = isOwnLike
                     ? Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN)
                     : Component.text(resolveName(broadcast.targetUuid())).color(NamedTextColor.WHITE);
-            int count = 0;
-            boolean alreadyReacted = false;
-            try {
-                count = eventRepository.countByBroadcastId(broadcast.broadcastId());
-                alreadyReacted = eventRepository.exists(broadcast.broadcastId(), player.getUniqueId());
-            } catch (SQLException e) {
-                log.log(Level.WARNING, "Failed to get reaction count for broadcastId: " + broadcast.broadcastId(), e);
-            }
+            int count = countMap.getOrDefault(broadcast.broadcastId(), 0);
+            boolean alreadyReacted = reactedIds.contains(broadcast.broadcastId());
             Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count,
                     alreadyReacted, true, !isOwnLike);
             player.sendMessage(msg);
