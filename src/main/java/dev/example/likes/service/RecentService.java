@@ -118,4 +118,20 @@ public class RecentService {
                 .filter(b -> b.broadcastId().equals(broadcastId))
                 .findFirst();
     }
+
+    /**
+     * Returns up to {@code limit} display codes from recent broadcasts, newest first.
+     * Used for tab completion suggestions.
+     *
+     * @param limit maximum number of codes to return
+     * @return list of display codes (without the {@code #} prefix)
+     */
+    public synchronized List<String> getRecentDisplayCodes(int limit) {
+        List<String> codes = new ArrayList<>(limit);
+        Iterator<LikesBroadcast> it = recentBuffer.descendingIterator();
+        for (int i = 0; i < limit && it.hasNext(); i++) {
+            codes.add(it.next().displayCode());
+        }
+        return codes;
+    }
 }

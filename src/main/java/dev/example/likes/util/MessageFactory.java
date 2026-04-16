@@ -88,7 +88,7 @@ public class MessageFactory {
         String heart = alreadyReacted ? "♥" : "♡";
         String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
         Component reactButton = Component.text("[" + heart + count + "]").color(NamedTextColor.GRAY);
-        Component codeLabel = Component.text("(" + displayCode + ")").color(NamedTextColor.DARK_GRAY)
+        Component codeLabel = Component.text("(#" + displayCode + ")").color(NamedTextColor.DARK_GRAY)
                 .decorate(TextDecoration.ITALIC);
 
         if (alreadyReacted) {
@@ -97,10 +97,10 @@ public class MessageFactory {
             reactButton = reactButton
                     .color(NamedTextColor.GRAY)
                     .decorate(TextDecoration.UNDERLINED)
-                    .clickEvent(ClickEvent.runCommand("/like boost " + displayCode))
+                    .clickEvent(ClickEvent.runCommand("/like #" + displayCode))
                     .hoverEvent(HoverEvent.showText(
                             Component.translatable("likes.broadcast.react.hover")
-                                    .append(Component.text("\nID: "))
+                                    .append(Component.text("\n#"))
                                     .append(Component.text(displayCode).color(NamedTextColor.WHITE))));
             codeLabel = codeLabel.color(NamedTextColor.WHITE);
         }
@@ -118,7 +118,7 @@ public class MessageFactory {
     public Component usageInfo(String... usageKeys) {
         Component msg = Component.translatable("likes.command.like.usage.prefix").color(NamedTextColor.YELLOW);
         for (int i = 0; i < usageKeys.length; i++) {
-            msg = msg.append(Component.text(i == 0 ? " " : " | ").color(NamedTextColor.YELLOW))
+            msg = msg.append(Component.text(i == 0 ? " " : "  |  ").color(NamedTextColor.YELLOW))
                     .append(Component.translatable("likes.command.like.usage." + usageKeys[i])
                             .color(NamedTextColor.YELLOW));
         }

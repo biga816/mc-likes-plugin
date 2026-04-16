@@ -29,10 +29,21 @@ import java.util.logging.Logger;
  * Unified handler for the /like command.
  *
  * <ul>
- * <li>{@code /like <player> <reason...>} — send a like</li>
- * <li>{@code /like boost [displayCode]} — react to a broadcast</li>
- * <li>{@code /like recent} — show the 5 most recent likes</li>
+ * <li>{@code /like <player> <reason...>} — send a like to a player</li>
+ * <li>{@code /like #<displayCode>} — react to a broadcast by display code</li>
+ * <li>{@code /like list} — show the 5 most recent likes</li>
  * </ul>
+ *
+ * <p>
+ * Argument routing:
+ * </p>
+ * <ol>
+ * <li>If the first argument starts with {@code #}, it is treated as a display
+ * code.</li>
+ * <li>If the first argument is {@code list} (case-insensitive), the list is
+ * shown.</li>
+ * <li>Otherwise, the first argument is treated as a player name.</li>
+ * </ol>
  */
 public class LikeCommand implements CommandExecutor, TabCompleter {
 
@@ -59,23 +70,26 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            player.sendMessage(messageFactory.usageInfo("like", "boost", "recent"));
+            player.sendMessage(messageFactory.usageInfo("like", "displaycode", "list"));
             return true;
         }
 
-        String sub = args[0].toLowerCase();
+        String first = args[0];
 
-        if (sub.equals("boost")) {
-            if (args.length >= 2) {
-                likeService.react(player, args[1]);
-            } else {
-                likeService.react(player);
+        // /like list
+        if (first.equalsIgnoreCase("list")) {
+            handleList(player);
+            return true;
+        }
+
+        // /like #<displayCode> — react by display code (strip the # prefix)
+        if (first.startsWith("#")) {
+            String displayCode = first.substring(1);
+            if (displayCode.isEmpty()) {
+                player.sendMessage(messageFactory.usageInfo("displaycode"));
+                return true;
             }
-            return true;
-        }
-
-        if (sub.equals("recent")) {
-            handleRecent(player);
+            likeService.react(player, displayCode);
             return true;
         }
 
@@ -85,9 +99,9 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        Player target = Bukkit.getPlayer(args[0]);
+        Player target = Bukkit.getPlayer(first);
         if (target == null) {
-            player.sendMessage(messageFactory.error("likes.error.player-not-found", Component.text(args[0])));
+            player.sendMessage(messageFactory.error("likes.error.player-not-found", Component.text(first)));
             return true;
         }
 
@@ -96,7 +110,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void handleRecent(Player player) {
+    private void handleList(Player player) {
         List<LikesBroadcast> recent = recentService.getRecent(5);
 
         if (recent.isEmpty()) {
@@ -148,14 +162,25 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             List<String> suggestions = new ArrayList<>();
-            List.of("boost", "recent").stream()
-                    .filter(s -> s.startsWith(partial))
+
+            // "list" subcommand
+            if ("list".startsWith(partial)) {
+                suggestions.add("list");
+            }
+
+            // Recent display codes with # prefix
+            recentService.getRecentDisplayCodes(5).stream()
+                    .map(code -> "#" + code)
+                    .filter(s -> s.toLowerCase().startsWith(partial))
                     .forEach(suggestions::add);
+
+            // Online player names
             Bukkit.getOnlinePlayers().stream()
                     .filter(p -> !p.equals(sender))
                     .map(Player::getName)
                     .filter(name -> name.toLowerCase().startsWith(partial))
                     .forEach(suggestions::add);
+
             return suggestions;
         }
         return List.of();

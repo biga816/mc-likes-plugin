@@ -296,7 +296,7 @@ public class LikeService {
 
         // 2. Check for duplicate reaction
         String displayCode = broadcast.displayCode();
-        Component displayCodeComponent = Component.text("(" + displayCode + ")").color(NamedTextColor.WHITE);
+        Component displayCodeComponent = Component.text("(#" + displayCode + ")").color(NamedTextColor.WHITE);
         try {
             if (eventRepository.exists(broadcast.broadcastId(), sender.getUniqueId())) {
                 sender.sendMessage(messageFactory.error("likes.error.already-reacted", displayCodeComponent));
