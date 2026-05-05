@@ -57,7 +57,8 @@ public class BroadcastRepository {
      * Finds the most recent broadcast matching the given displayCode.
      *
      * @param displayCode the display code to search for
-     * @return an Optional containing the most recent matching broadcast, or empty if not found
+     * @return an Optional containing the most recent matching broadcast, or empty
+     *         if not found
      * @throws SQLException if a database operation fails
      */
     public Optional<LikesBroadcast> findLatestByDisplayCode(String displayCode) throws SQLException {
@@ -98,7 +99,8 @@ public class BroadcastRepository {
 
     /**
      * Checks whether a broadcast with the given displayCode exists within the most
-     * recent {@code recentWindow} broadcasts. Used for collision detection during code
+     * recent {@code recentWindow} broadcasts. Used for collision detection during
+     * code
      * generation.
      *
      * @param displayCode  the display code to check
@@ -121,6 +123,71 @@ public class BroadcastRepository {
             ps.setInt(2, recentWindow);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
+            }
+        }
+    }
+
+    // ── Mine-related read methods ─────────────────────────────────────────────
+
+    /**
+     * Returns the most recent broadcasts in which the given player was the
+     * recipient.
+     * Used for the future {@code /like mine} command.
+     *
+     * @param playerUuid the recipient's UUID
+     * @param limit      maximum number of results
+     * @return list of broadcasts ordered by created_at DESC
+     * @throws SQLException if a database error occurs
+     */
+    public List<LikesBroadcast> getRecentBroadcastsReceivedBy(UUID playerUuid, int limit)
+            throws SQLException {
+        String sql = """
+                SELECT * FROM likes_broadcasts
+                WHERE target_uuid = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """;
+        Connection conn = databaseManager.getConnection();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<LikesBroadcast> results = new ArrayList<>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
+            }
+        }
+    }
+
+    /**
+     * Returns the most recent broadcasts sent by the given player.
+     * Used for the future {@code /like mine} command.
+     *
+     * @param playerUuid the sender's UUID
+     * @param limit      maximum number of results
+     * @return list of broadcasts ordered by created_at DESC
+     * @throws SQLException if a database error occurs
+     */
+    public List<LikesBroadcast> getRecentBroadcastsSentBy(UUID playerUuid, int limit)
+            throws SQLException {
+        String sql = """
+                SELECT * FROM likes_broadcasts
+                WHERE source_sender_uuid = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """;
+        Connection conn = databaseManager.getConnection();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<LikesBroadcast> results = new ArrayList<>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
             }
         }
     }

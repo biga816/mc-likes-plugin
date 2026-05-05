@@ -2,9 +2,12 @@ package dev.example.likes;
 
 import dev.example.likes.command.LikeCommand;
 import dev.example.likes.database.BroadcastRepository;
+import dev.example.likes.database.BroadcastStatsRepository;
 import dev.example.likes.database.DailyLimitRepository;
 import dev.example.likes.database.DatabaseManager;
+import dev.example.likes.database.DatabaseWriteExecutor;
 import dev.example.likes.database.EventRepository;
+import dev.example.likes.database.PlayerStatsRepository;
 import dev.example.likes.service.CooldownService;
 import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
@@ -19,12 +22,13 @@ import java.util.logging.Level;
 /**
  * Entry point for the Likes plugin.
  * Initializes i18n, the database, wires dependencies, and registers commands in
- * onEnable().
- * Closes the database connection and unregisters translations in onDisable().
+ * onEnable(). Closes the database connection and unregisters translations in
+ * onDisable().
  */
 public class LikesPlugin extends JavaPlugin {
 
     private DatabaseManager databaseManager;
+    private DatabaseWriteExecutor writeExecutor;
     private I18nService i18nService;
 
     @Override
@@ -50,12 +54,17 @@ public class LikesPlugin extends JavaPlugin {
             return;
         }
 
-        // 3. Initialize repositories
+        // 3. Initialize the single-writer executor
+        writeExecutor = new DatabaseWriteExecutor();
+
+        // 4. Initialize repositories
         BroadcastRepository broadcastRepo = new BroadcastRepository(databaseManager);
         EventRepository eventRepo = new EventRepository(databaseManager);
         DailyLimitRepository dailyRepo = new DailyLimitRepository(databaseManager);
+        PlayerStatsRepository playerStatsRepo = new PlayerStatsRepository(databaseManager);
+        BroadcastStatsRepository broadcastStatsRepo = new BroadcastStatsRepository(databaseManager);
 
-        // 4. Initialize services
+        // 5. Initialize services
         CooldownService cooldownService = new CooldownService(getConfig());
         RecentService recentService = new RecentService(getConfig());
         try {
@@ -71,11 +80,13 @@ public class LikesPlugin extends JavaPlugin {
 
         LikeService likeService = new LikeService(
                 broadcastRepo, eventRepo, dailyRepo,
+                playerStatsRepo, broadcastStatsRepo,
+                databaseManager, writeExecutor,
                 displayCodeGen, cooldownService, recentService, messageFactory,
                 getConfig(), this);
 
-        // 5. Register commands
-        LikeCommand likeCommand = new LikeCommand(likeService, recentService, eventRepo, messageFactory);
+        // 6. Register commands
+        LikeCommand likeCommand = new LikeCommand(likeService, recentService, broadcastStatsRepo, eventRepo, messageFactory);
         getCommand("like").setExecutor(likeCommand);
         getCommand("like").setTabCompleter(likeCommand);
 
@@ -84,6 +95,9 @@ public class LikesPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (writeExecutor != null) {
+            writeExecutor.shutdown();
+        }
         if (i18nService != null) {
             i18nService.close();
         }

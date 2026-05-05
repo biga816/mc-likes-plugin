@@ -8,9 +8,13 @@ import java.sql.Statement;
 import java.util.logging.Logger;
 
 /**
- * Manages the SQLite database connection.
+ * Manages the SQLite database connection and schema.
+ * <p>
  * Holds a long-lived connection that is initialized on plugin startup and
- * closed on shutdown.
+ * closed on shutdown. All write access must go through
+ * {@link DatabaseWriteExecutor}; this class provides a
+ * {@link #executeInTransaction} helper for transactional write tasks.
+ * </p>
  */
 public class DatabaseManager {
 
@@ -32,8 +36,8 @@ public class DatabaseManager {
     }
 
     /**
-     * Establishes the database connection and initializes tables.
-     * Enables WAL mode and creates any missing tables.
+     * Establishes the database connection and initializes the schema.
+     * Applies required PRAGMAs and creates all tables and indexes.
      *
      * @throws SQLException if a database operation fails
      */
@@ -42,57 +46,154 @@ public class DatabaseManager {
         LOGGER.info("SQLite database connected: " + jdbcUrl);
 
         try (Statement stmt = connection.createStatement()) {
-            // Enable WAL mode for better write performance
-            stmt.execute("PRAGMA journal_mode=WAL");
 
-            // likes_broadcasts table
+            // ── PRAGMAs ────────────────────────────────────────────────────────
+            // WAL mode: allows concurrent reads while a single writer is active.
+            stmt.execute("PRAGMA journal_mode=WAL");
+            // Busy timeout: secondary safeguard in case of unexpected contention.
+            stmt.execute("PRAGMA busy_timeout=5000");
+            // Enforce foreign-key constraints.
+            stmt.execute("PRAGMA foreign_keys=ON");
+
+            // ── Core tables ────────────────────────────────────────────────────
+
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_broadcasts (
-                        broadcast_id TEXT PRIMARY KEY,
-                        display_code TEXT NOT NULL,
-                        created_at INTEGER NOT NULL,
-                        source_type TEXT NOT NULL,
-                        source_sender_uuid TEXT NOT NULL,
-                        target_uuid TEXT NOT NULL,
-                        reason_code TEXT NOT NULL,
-                        reason_text TEXT NOT NULL
+                        broadcast_id        TEXT PRIMARY KEY,
+                        display_code        TEXT NOT NULL,
+                        created_at          INTEGER NOT NULL,
+                        source_type         TEXT NOT NULL,
+                        source_sender_uuid  TEXT NOT NULL,
+                        target_uuid         TEXT NOT NULL,
+                        reason_code         TEXT NOT NULL,
+                        reason_text         TEXT NOT NULL
                     )
                     """);
 
-            // likes_events table
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_events (
-                        event_id TEXT PRIMARY KEY,
-                        created_at INTEGER NOT NULL,
+                        event_id     TEXT PRIMARY KEY,
+                        created_at   INTEGER NOT NULL,
                         broadcast_id TEXT NOT NULL,
-                        sender_uuid TEXT NOT NULL,
-                        target_uuid TEXT NOT NULL,
+                        sender_uuid  TEXT NOT NULL,
+                        target_uuid  TEXT NOT NULL,
                         FOREIGN KEY(broadcast_id) REFERENCES likes_broadcasts(broadcast_id),
                         UNIQUE(broadcast_id, sender_uuid)
                     )
                     """);
 
-            // likes_sender_daily table
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_sender_daily (
-                        date TEXT NOT NULL,
-                        sender_uuid TEXT NOT NULL,
+                        date             TEXT NOT NULL,
+                        sender_uuid      TEXT NOT NULL,
                         direct_like_count INTEGER NOT NULL,
                         PRIMARY KEY(date, sender_uuid)
                     )
                     """);
+
+            // ── Aggregation tables ─────────────────────────────────────────────
+
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS like_player_stats (
+                        player_uuid    TEXT PRIMARY KEY,
+                        player_name    TEXT NOT NULL,
+                        received_count INTEGER NOT NULL DEFAULT 0,
+                        sent_count     INTEGER NOT NULL DEFAULT 0,
+                        reacted_count  INTEGER NOT NULL DEFAULT 0,
+                        updated_at     INTEGER NOT NULL
+                    )
+                    """);
+
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS like_broadcast_stats (
+                        broadcast_id   TEXT PRIMARY KEY,
+                        reaction_count INTEGER NOT NULL DEFAULT 0,
+                        updated_at     INTEGER NOT NULL,
+                        FOREIGN KEY(broadcast_id)
+                            REFERENCES likes_broadcasts(broadcast_id)
+                            ON DELETE CASCADE
+                    )
+                    """);
+
+            // ── Indexes on existing tables ─────────────────────────────────────
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_created_at
+                    ON likes_broadcasts(created_at DESC)
+                    """);
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_display_code_created_at
+                    ON likes_broadcasts(display_code, created_at DESC)
+                    """);
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_likes_events_broadcast_sender
+                    ON likes_events(broadcast_id, sender_uuid)
+                    """);
+
+            // ── Indexes on aggregation tables ──────────────────────────────────
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_received
+                    ON like_player_stats(received_count DESC)
+                    """);
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_sent
+                    ON like_player_stats(sent_count DESC)
+                    """);
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_reacted
+                    ON like_player_stats(reacted_count DESC)
+                    """);
+
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_like_broadcast_stats_reaction
+                    ON like_broadcast_stats(reaction_count DESC)
+                    """);
         }
 
-        LOGGER.info("Database tables initialized successfully.");
+        LOGGER.info("Database schema initialized successfully.");
     }
 
     /**
      * Returns the current database connection.
+     * <p>
+     * Write operations must be invoked from within a task submitted to
+     * {@link DatabaseWriteExecutor} to guarantee serialization.
+     * </p>
      *
      * @return the SQLite connection
      */
     public Connection getConnection() {
         return connection;
+    }
+
+    /**
+     * Executes a transactional write task on the current connection.
+     * <p>
+     * Sets {@code autoCommit=false}, runs the task, then commits. If the task
+     * throws, the transaction is rolled back and the exception is re-thrown.
+     * This method must be called from within a task submitted to
+     * {@link DatabaseWriteExecutor}.
+     * </p>
+     *
+     * @param task the transactional task to execute
+     * @throws SQLException if a database error occurs or the task throws
+     */
+    public void executeInTransaction(TransactionTask task) throws SQLException {
+        connection.setAutoCommit(false);
+        try {
+            task.execute(connection);
+            connection.commit();
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
+        } finally {
+            connection.setAutoCommit(true);
+        }
     }
 
     /**
@@ -108,5 +209,11 @@ public class DatabaseManager {
                 LOGGER.warning("Failed to close database connection: " + e.getMessage());
             }
         }
+    }
+
+    /** Functional interface for a transactional SQL task. */
+    @FunctionalInterface
+    public interface TransactionTask {
+        void execute(Connection conn) throws SQLException;
     }
 }

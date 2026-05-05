@@ -6,10 +6,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -54,24 +52,6 @@ public class EventRepository {
     }
 
     /**
-     * Returns the total number of events (reactions) for the given broadcast ID.
-     *
-     * @param broadcastId the broadcast ID to count
-     * @return the number of events
-     * @throws SQLException if a database operation fails
-     */
-    public int countByBroadcastId(String broadcastId) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM likes_events WHERE broadcast_id = ?";
-        Connection conn = databaseManager.getConnection();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, broadcastId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getInt(1) : 0;
-            }
-        }
-    }
-
-    /**
      * Checks whether an event exists for the given broadcast ID and sender UUID.
      * Used to prevent duplicate likes on the same broadcast.
      *
@@ -93,34 +73,45 @@ public class EventRepository {
     }
 
     /**
-     * Returns the reaction count for each of the given broadcast IDs in a single query.
-     * Broadcast IDs with no reactions are not included in the returned map.
+     * Returns recent broadcasts that the given player has reacted to, ordered by
+     * event creation time descending. Used for the future {@code /like mine}
+     * command.
      *
-     * @param broadcastIds the list of broadcast IDs to count
-     * @return a map of broadcastId → reaction count
-     * @throws SQLException if a database operation fails
+     * @param senderUuid the reactor's UUID
+     * @param limit      maximum number of results
+     * @return list of event records ordered by created_at DESC
+     * @throws SQLException if a database error occurs
      */
-    public Map<String, Integer> countByBroadcastIds(List<String> broadcastIds) throws SQLException {
-        if (broadcastIds.isEmpty()) return Map.of();
-        String placeholders = broadcastIds.stream().map(id -> "?").collect(Collectors.joining(", "));
-        String sql = "SELECT broadcast_id, COUNT(*) FROM likes_events WHERE broadcast_id IN (" + placeholders + ") GROUP BY broadcast_id";
+    public List<dev.example.likes.model.LikesEvent> getRecentReactionsBy(UUID senderUuid, int limit)
+            throws SQLException {
+        String sql = """
+                SELECT * FROM likes_events
+                WHERE sender_uuid = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < broadcastIds.size(); i++) {
-                ps.setString(i + 1, broadcastIds.get(i));
-            }
+            ps.setString(1, senderUuid.toString());
+            ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                Map<String, Integer> result = new HashMap<>();
+                java.util.List<dev.example.likes.model.LikesEvent> results = new java.util.ArrayList<>();
                 while (rs.next()) {
-                    result.put(rs.getString(1), rs.getInt(2));
+                    results.add(new dev.example.likes.model.LikesEvent(
+                            rs.getString("event_id"),
+                            rs.getLong("created_at"),
+                            rs.getString("broadcast_id"),
+                            UUID.fromString(rs.getString("sender_uuid")),
+                            UUID.fromString(rs.getString("target_uuid"))));
                 }
-                return result;
+                return results;
             }
         }
     }
 
     /**
-     * Returns the set of broadcast IDs (from the given list) that the specified sender has already reacted to.
+     * Returns the set of broadcast IDs (from the given list) that the specified
+     * sender has already reacted to.
      *
      * @param broadcastIds the list of broadcast IDs to check
      * @param senderUuid   the sender's UUID
@@ -128,9 +119,11 @@ public class EventRepository {
      * @throws SQLException if a database operation fails
      */
     public Set<String> reactedBroadcastIds(List<String> broadcastIds, UUID senderUuid) throws SQLException {
-        if (broadcastIds.isEmpty()) return Set.of();
+        if (broadcastIds.isEmpty())
+            return Set.of();
         String placeholders = broadcastIds.stream().map(id -> "?").collect(Collectors.joining(", "));
-        String sql = "SELECT broadcast_id FROM likes_events WHERE broadcast_id IN (" + placeholders + ") AND sender_uuid = ?";
+        String sql = "SELECT broadcast_id FROM likes_events WHERE broadcast_id IN (" + placeholders
+                + ") AND sender_uuid = ?";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < broadcastIds.size(); i++) {

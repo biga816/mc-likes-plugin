@@ -1,5 +1,6 @@
 package dev.example.likes.command;
 
+import dev.example.likes.database.BroadcastStatsRepository;
 import dev.example.likes.database.EventRepository;
 import dev.example.likes.model.LikesBroadcast;
 import dev.example.likes.service.LikeService;
@@ -51,13 +52,16 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
 
     private final LikeService likeService;
     private final RecentService recentService;
+    private final BroadcastStatsRepository broadcastStatsRepository;
     private final EventRepository eventRepository;
     private final MessageFactory messageFactory;
 
     public LikeCommand(LikeService likeService, RecentService recentService,
+            BroadcastStatsRepository broadcastStatsRepository,
             EventRepository eventRepository, MessageFactory messageFactory) {
         this.likeService = likeService;
         this.recentService = recentService;
+        this.broadcastStatsRepository = broadcastStatsRepository;
         this.eventRepository = eventRepository;
         this.messageFactory = messageFactory;
     }
@@ -119,10 +123,11 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         }
 
         List<String> broadcastIds = recent.stream().map(LikesBroadcast::broadcastId).toList();
-        Map<String, Integer> countMap = new HashMap<>();
+        Map<String, Long> countMap = new HashMap<>();
         Set<String> reactedIds = new HashSet<>();
         try {
-            countMap = eventRepository.countByBroadcastIds(broadcastIds);
+            // Read reaction_count from the aggregation table to avoid per-call COUNT on likes_events
+            countMap = broadcastStatsRepository.reactionCountByBroadcastIds(broadcastIds);
             reactedIds = eventRepository.reactedBroadcastIds(broadcastIds, player.getUniqueId());
         } catch (SQLException e) {
             log.log(Level.WARNING, "Failed to get reaction data for recent broadcasts", e);
@@ -138,7 +143,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             Component targetDisplay = isOwnLike
                     ? Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN)
                     : Component.text(resolveName(broadcast.targetUuid())).color(NamedTextColor.WHITE);
-            int count = countMap.getOrDefault(broadcast.broadcastId(), 0);
+            int count = countMap.getOrDefault(broadcast.broadcastId(), 0L).intValue();
             boolean alreadyReacted = reactedIds.contains(broadcast.broadcastId());
             Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count,
                     alreadyReacted, true, !isOwnLike);
