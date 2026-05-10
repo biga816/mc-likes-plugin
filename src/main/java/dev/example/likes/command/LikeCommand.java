@@ -1,5 +1,6 @@
 package dev.example.likes.command;
 
+import dev.example.likes.book.LikeBookService;
 import dev.example.likes.database.BroadcastStatsRepository;
 import dev.example.likes.database.EventRepository;
 import dev.example.likes.model.LikesBroadcast;
@@ -55,15 +56,18 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
     private final BroadcastStatsRepository broadcastStatsRepository;
     private final EventRepository eventRepository;
     private final MessageFactory messageFactory;
+    private final LikeBookService bookService;
 
     public LikeCommand(LikeService likeService, RecentService recentService,
             BroadcastStatsRepository broadcastStatsRepository,
-            EventRepository eventRepository, MessageFactory messageFactory) {
+            EventRepository eventRepository, MessageFactory messageFactory,
+            LikeBookService bookService) {
         this.likeService = likeService;
         this.recentService = recentService;
         this.broadcastStatsRepository = broadcastStatsRepository;
         this.eventRepository = eventRepository;
         this.messageFactory = messageFactory;
+        this.bookService = bookService;
     }
 
     @Override
@@ -74,7 +78,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            player.sendMessage(messageFactory.usageInfo("like", "displaycode", "list"));
+            player.sendMessage(messageFactory.usageInfo("like", "displaycode", "list", "ranking", "mine"));
             return true;
         }
 
@@ -83,6 +87,18 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         // /like list
         if (first.equalsIgnoreCase("list")) {
             handleList(player);
+            return true;
+        }
+
+        // /like ranking — book UI
+        if (first.equalsIgnoreCase("ranking")) {
+            bookService.openRankingBook(player);
+            return true;
+        }
+
+        // /like mine — book UI
+        if (first.equalsIgnoreCase("mine")) {
+            bookService.openMineBook(player);
             return true;
         }
 
@@ -126,7 +142,8 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         Map<String, Long> countMap = new HashMap<>();
         Set<String> reactedIds = new HashSet<>();
         try {
-            // Read reaction_count from the aggregation table to avoid per-call COUNT on likes_events
+            // Read reaction_count from the aggregation table to avoid per-call COUNT on
+            // likes_events
             countMap = broadcastStatsRepository.reactionCountByBroadcastIds(broadcastIds);
             reactedIds = eventRepository.reactedBroadcastIds(broadcastIds, player.getUniqueId());
         } catch (SQLException e) {
@@ -168,10 +185,13 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             String partial = args[0].toLowerCase();
             List<String> suggestions = new ArrayList<>();
 
-            // "list" subcommand
-            if ("list".startsWith(partial)) {
+            // Subcommands
+            if ("list".startsWith(partial))
                 suggestions.add("list");
-            }
+            if ("ranking".startsWith(partial))
+                suggestions.add("ranking");
+            if ("mine".startsWith(partial))
+                suggestions.add("mine");
 
             // Recent display codes with # prefix
             recentService.getRecentDisplayCodes(5).stream()

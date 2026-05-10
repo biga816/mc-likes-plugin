@@ -8,6 +8,7 @@ import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 
 /**
  * Factory for building chat message components using the Adventure API.
@@ -156,5 +157,17 @@ public class MessageFactory {
      */
     public Component success(String key, ComponentLike... args) {
         return Component.translatable(key, args).color(NamedTextColor.GREEN);
+    }
+
+    /**
+     * Returns a {@link PlayerTranslator} bound to the given player's locale.
+     * Use this for contexts where Adventure cannot resolve translatable components
+     * automatically (e.g. book NBT pages).
+     *
+     * @param player the player whose locale should be used
+     * @return a locale-bound translator
+     */
+    public PlayerTranslator translatorFor(Player player) {
+        return new PlayerTranslator(player.locale());
     }
 }

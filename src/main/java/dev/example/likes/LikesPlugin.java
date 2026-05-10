@@ -1,5 +1,6 @@
 package dev.example.likes;
 
+import dev.example.likes.book.LikeBookService;
 import dev.example.likes.command.LikeCommand;
 import dev.example.likes.database.BroadcastRepository;
 import dev.example.likes.database.BroadcastStatsRepository;
@@ -85,8 +86,13 @@ public class LikesPlugin extends JavaPlugin {
                 displayCodeGen, cooldownService, recentService, messageFactory,
                 getConfig(), this);
 
-        // 6. Register commands
-        LikeCommand likeCommand = new LikeCommand(likeService, recentService, broadcastStatsRepo, eventRepo, messageFactory);
+        // 6. Book UI service
+        LikeBookService bookService = new LikeBookService(
+                playerStatsRepo, broadcastStatsRepo, broadcastRepo, messageFactory, this);
+
+        // 7. Register commands
+        LikeCommand likeCommand = new LikeCommand(likeService, recentService,
+                broadcastStatsRepo, eventRepo, messageFactory, bookService);
         getCommand("like").setExecutor(likeCommand);
         getCommand("like").setTabCompleter(likeCommand);
 
