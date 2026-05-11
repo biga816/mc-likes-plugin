@@ -88,7 +88,7 @@ public class LikesPlugin extends JavaPlugin {
 
         // 6. Book UI service
         LikeBookService bookService = new LikeBookService(
-                playerStatsRepo, broadcastStatsRepo, broadcastRepo, messageFactory, this);
+                playerStatsRepo, broadcastStatsRepo, broadcastRepo, eventRepo, messageFactory, this);
 
         // 7. Register commands
         LikeCommand likeCommand = new LikeCommand(likeService, recentService,

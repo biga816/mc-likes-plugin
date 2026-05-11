@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,11 +50,13 @@ public class LikeRankingBookRenderer {
                         List<LikePlayerStats> received,
                         List<LikePlayerStats> sent,
                         List<BroadcastRankingEntry> popular,
+                        UUID viewerUuid,
+                        Set<String> reactedBroadcastIds,
                         PlayerTranslator translator) {
                 List<Component> pages = new ArrayList<>();
                 pages.add(buildReceivedPage(received, translator));
                 pages.add(buildSentPage(sent, translator));
-                pages.add(buildPopularPage(popular, translator));
+                pages.add(buildPopularPage(popular, viewerUuid, reactedBroadcastIds, translator));
                 return pages;
         }
 
@@ -116,7 +119,8 @@ public class LikeRankingBookRenderer {
                 return b.build();
         }
 
-        private Component buildPopularPage(List<BroadcastRankingEntry> list, PlayerTranslator tr) {
+        private Component buildPopularPage(List<BroadcastRankingEntry> list, UUID viewerUuid,
+                        Set<String> reactedBroadcastIds, PlayerTranslator tr) {
                 TextComponent.Builder b = Component.text();
                 b.append(Component.text(tr.translate("likes.book.ranking.popular"))
                                 .color(NamedTextColor.DARK_GRAY)
@@ -135,17 +139,28 @@ public class LikeRankingBookRenderer {
                                 String targetName = truncate(resolveName(entry.targetUuid()), 7);
                                 String reason = truncate(entry.reasonText(), MAX_REASON_LEN);
                                 String code = entry.displayCode();
+                                boolean alreadyReacted = reactedBroadcastIds.contains(entry.broadcastId());
+                                boolean isViewer = entry.sourceSenderUuid().equals(viewerUuid)
+                                                || entry.targetUuid().equals(viewerUuid);
+
+                                NamedTextColor senderColor = entry.sourceSenderUuid().equals(viewerUuid)
+                                                ? NamedTextColor.GREEN
+                                                : NamedTextColor.BLACK;
+                                NamedTextColor targetColor = entry.targetUuid().equals(viewerUuid)
+                                                ? NamedTextColor.GREEN
+                                                : NamedTextColor.BLACK;
 
                                 b.append(Component.newline());
                                 b.append(Component.text((i + 1) + ". ")
                                                 .color(NamedTextColor.DARK_GRAY));
                                 b.append(Component.text(senderName)
-                                                .color(NamedTextColor.BLACK));
+                                                .color(senderColor));
                                 b.append(Component.text("→")
                                                 .color(NamedTextColor.RED));
                                 b.append(Component.text(targetName + " ")
-                                                .color(NamedTextColor.BLACK));
-                                b.append(buildClickableHeart(code, entry.reactionCount(), tr));
+                                                .color(targetColor));
+                                b.append(buildClickableHeart(code, entry.reactionCount(), alreadyReacted, isViewer,
+                                                tr));
                                 b.append(Component.newline());
                                 b.append(Component.text("   " + reason)
                                                 .color(NamedTextColor.GRAY)
@@ -170,16 +185,16 @@ public class LikeRankingBookRenderer {
          * @param tr    locale-bound translator for the hover tooltip
          * @return the styled, clickable component
          */
-        static Component buildClickableHeart(String code, long count, PlayerTranslator tr) {
-                return Component.text("")
-                                .color(NamedTextColor.RED)
-                                .append(Component.text("[♡" + count + "]")
-                                                .color(NamedTextColor.RED)
-                                                .decorate(TextDecoration.UNDERLINED)
-                                                .clickEvent(ClickEvent.runCommand("/like #" + code))
-                                                .hoverEvent(HoverEvent.showText(
-                                                                Component.text(tr.translate("likes.book.click_like"))
-                                                                                .color(NamedTextColor.GRAY))));
+        static Component buildClickableHeart(String code, long count, boolean alreadyReacted, boolean isViewer,
+                        PlayerTranslator tr) {
+                String symbol = alreadyReacted ? "♥" : "♡";
+                Component heart = Component.text("[" + symbol + count + "]").color(NamedTextColor.RED);
+                if (!alreadyReacted && !isViewer) {
+                        heart = heart
+                                        .decorate(TextDecoration.UNDERLINED)
+                                        .clickEvent(ClickEvent.runCommand("/like #" + code));
+                }
+                return Component.text("").color(NamedTextColor.RED).append(heart);
         }
 
         private static String truncate(String text, int max) {

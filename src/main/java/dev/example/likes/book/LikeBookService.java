@@ -2,6 +2,7 @@ package dev.example.likes.book;
 
 import dev.example.likes.database.BroadcastRepository;
 import dev.example.likes.database.BroadcastStatsRepository;
+import dev.example.likes.database.EventRepository;
 import dev.example.likes.database.PlayerStatsRepository;
 import dev.example.likes.model.BroadcastRankingEntry;
 import dev.example.likes.model.LikePlayerStats;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -53,6 +55,7 @@ public class LikeBookService {
     private final PlayerStatsRepository playerStatsRepo;
     private final BroadcastStatsRepository broadcastStatsRepo;
     private final BroadcastRepository broadcastRepo;
+    private final EventRepository eventRepo;
     private final MessageFactory messageFactory;
     private final JavaPlugin plugin;
     private final LikeRankingBookRenderer rankingRenderer;
@@ -64,6 +67,7 @@ public class LikeBookService {
      * @param playerStatsRepo    repository for per-player aggregation data
      * @param broadcastStatsRepo repository for per-broadcast aggregation data
      * @param broadcastRepo      repository for raw broadcast records
+     * @param eventRepo          repository for like events (reaction lookups)
      * @param messageFactory     factory used to obtain per-player translators
      * @param plugin             the plugin instance (for scheduler access)
      */
@@ -71,11 +75,13 @@ public class LikeBookService {
             PlayerStatsRepository playerStatsRepo,
             BroadcastStatsRepository broadcastStatsRepo,
             BroadcastRepository broadcastRepo,
+            EventRepository eventRepo,
             MessageFactory messageFactory,
             JavaPlugin plugin) {
         this.playerStatsRepo = playerStatsRepo;
         this.broadcastStatsRepo = broadcastStatsRepo;
         this.broadcastRepo = broadcastRepo;
+        this.eventRepo = eventRepo;
         this.messageFactory = messageFactory;
         this.plugin = plugin;
         this.rankingRenderer = new LikeRankingBookRenderer();
@@ -95,9 +101,14 @@ public class LikeBookService {
                 List<LikePlayerStats> received = playerStatsRepo.getTopReceivedPlayers(RANKING_LIMIT);
                 List<LikePlayerStats> sent = playerStatsRepo.getTopSentPlayers(RANKING_LIMIT);
                 List<BroadcastRankingEntry> popular = broadcastStatsRepo.getTopBroadcasts(POPULAR_LIMIT);
+                List<String> popularIds = popular.stream()
+                        .map(BroadcastRankingEntry::broadcastId)
+                        .toList();
+                Set<String> reacted = eventRepo.reactedBroadcastIds(popularIds, player.getUniqueId());
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    List<Component> pages = rankingRenderer.buildPages(received, sent, popular, tr);
+                    List<Component> pages = rankingRenderer.buildPages(
+                            received, sent, popular, player.getUniqueId(), reacted, tr);
                     openBook(player, tr.translate("likes.book.ranking.title"), pages);
                 });
             } catch (SQLException e) {
