@@ -28,7 +28,7 @@ import java.util.UUID;
 public class LikeMineBookRenderer {
 
     private static final int MAX_NAME_LEN = 14;
-    private static final int MAX_REASON_LEN = 18;
+    private static final int MAX_REASON_LEN = 17;
 
     /** Number of recent received entries shown on the summary page. */
     private static final int SUMMARY_RECENT_LIMIT = 3;
@@ -137,7 +137,7 @@ public class LikeMineBookRenderer {
                         .color(NamedTextColor.BLACK));
                 b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
                 b.append(Component.newline());
-                b.append(Component.text("   " + reason)
+                b.append(Component.text("   \"" + reason + "\"")
                         .color(NamedTextColor.GRAY)
                         .hoverEvent(HoverEvent.showText(
                                 Component.text(bc.reasonText() != null ? bc.reasonText() : "")
@@ -173,7 +173,7 @@ public class LikeMineBookRenderer {
                         .color(NamedTextColor.BLACK));
                 b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
                 b.append(Component.newline());
-                b.append(Component.text("   " + reason)
+                b.append(Component.text("   \"" + reason + "\"")
                         .color(NamedTextColor.GRAY)
                         .hoverEvent(HoverEvent.showText(
                                 Component.text(bc.reasonText() != null ? bc.reasonText() : "")
@@ -197,7 +197,7 @@ public class LikeMineBookRenderer {
                 .color(NamedTextColor.BLACK));
         b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
         b.append(Component.newline());
-        b.append(Component.text("  " + reason)
+        b.append(Component.text("   \"" + reason + "\"")
                 .color(NamedTextColor.GRAY)
                 .hoverEvent(HoverEvent.showText(
                         Component.text(bc.reasonText() != null ? bc.reasonText() : "")

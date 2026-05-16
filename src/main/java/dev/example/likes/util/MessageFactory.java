@@ -10,6 +10,10 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
 /**
  * Factory for building chat message components using the Adventure API.
  * <p>
@@ -19,6 +23,8 @@ import org.bukkit.entity.Player;
  * </p>
  */
 public class MessageFactory {
+
+    private static final DateTimeFormatter LOG_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final String prefix;
 
@@ -31,6 +37,62 @@ public class MessageFactory {
      */
     public MessageFactory(FileConfiguration config) {
         this.prefix = config.getString("broadcast.prefix", "[LIKE]");
+    }
+
+    /**
+     * Builds a broadcast message for {@code /like log} with an absolute datetime
+     * label inserted between the prefix and the sender name.
+     * <p>
+     * Format:
+     * {@code [LIKE][yyyy-MM-dd HH:mm] sender -♥→ target "reason"  [♡n]  (#code)}
+     * </p>
+     *
+     * @param broadcast      the broadcast data
+     * @param senderDisplay  pre-built component for the sender name slot
+     * @param targetDisplay  pre-built component for the target name slot
+     * @param reactionCount  total number of reactions, or {@code -1} to show no
+     *                       count
+     * @param alreadyReacted whether the viewing player has already reacted
+     * @param clickable      whether the react button should have a click event
+     * @return the assembled {@link Component}
+     */
+    public Component buildLogBroadcastMessage(LikesBroadcast broadcast,
+            Component senderDisplay, Component targetDisplay,
+            int reactionCount, boolean alreadyReacted, boolean clickable) {
+        String dateLabel = "[" + LOG_DATE_FORMAT.format(
+                Instant.ofEpochMilli(broadcast.createdAt())
+                        .atZone(ZoneId.systemDefault()))
+                + "]";
+
+        String displayCode = broadcast.displayCode();
+        Component message = Component.text(dateLabel + " ")
+                .color(NamedTextColor.AQUA)
+                .append(senderDisplay)
+                .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
+                .append(targetDisplay)
+                .append(Component.newline())
+                .append(Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
+
+        String heart = alreadyReacted ? "♥" : "♡";
+        String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
+        Component reactButton = Component.text("[" + heart + count + "]").color(NamedTextColor.GRAY);
+        Component codeLabel = Component.text("(#" + displayCode + ")").color(NamedTextColor.DARK_GRAY)
+                .decorate(TextDecoration.ITALIC);
+
+        if (alreadyReacted) {
+            reactButton = reactButton.color(NamedTextColor.RED);
+        } else if (clickable) {
+            reactButton = reactButton
+                    .decorate(TextDecoration.UNDERLINED)
+                    .clickEvent(ClickEvent.runCommand("/like #" + displayCode))
+                    .hoverEvent(HoverEvent.showText(
+                            Component.translatable("likes.broadcast.react.hover")
+                                    .append(Component.text("\n#"))
+                                    .append(Component.text(displayCode).color(NamedTextColor.WHITE))));
+            codeLabel = codeLabel.color(NamedTextColor.WHITE);
+        }
+
+        return message.append(Component.text("  ")).append(reactButton).append(Component.text("  ")).append(codeLabel);
     }
 
     /**

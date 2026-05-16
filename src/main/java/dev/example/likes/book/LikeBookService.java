@@ -52,6 +52,12 @@ public class LikeBookService {
     /** Number of broadcasts shown on each mine received/sent page. */
     private static final int MINE_LIMIT = 5;
 
+    /** Maximum number of broadcasts loaded for the feed. */
+    private static final int FEED_MAX_ITEMS = 40;
+
+    /** Number of feed entries shown per book page. */
+    private static final int FEED_ITEMS_PER_PAGE = 4;
+
     private final PlayerStatsRepository playerStatsRepo;
     private final BroadcastStatsRepository broadcastStatsRepo;
     private final BroadcastRepository broadcastRepo;
@@ -60,6 +66,7 @@ public class LikeBookService {
     private final JavaPlugin plugin;
     private final LikeRankingBookRenderer rankingRenderer;
     private final LikeMineBookRenderer mineRenderer;
+    private final LikeFeedBookRenderer feedRenderer;
 
     /**
      * Constructs the service with all required dependencies.
@@ -86,6 +93,7 @@ public class LikeBookService {
         this.plugin = plugin;
         this.rankingRenderer = new LikeRankingBookRenderer();
         this.mineRenderer = new LikeMineBookRenderer();
+        this.feedRenderer = new LikeFeedBookRenderer();
     }
 
     /**
@@ -150,6 +158,42 @@ public class LikeBookService {
                 });
             } catch (SQLException e) {
                 log.log(Level.WARNING, "Failed to fetch mine data for " + player.getName(), e);
+                plugin.getServer().getScheduler().runTask(plugin,
+                        () -> player.sendMessage(Component.text(tr.translate("likes.error.internal"))
+                                .color(NamedTextColor.RED)));
+            }
+        });
+    }
+
+    /**
+     * Fetches the most recent like broadcasts asynchronously and opens a
+     * multi-page feed book on the main thread when done.
+     *
+     * @param player the player to open the book for
+     */
+    public void openFeedBook(Player player) {
+        PlayerTranslator tr = messageFactory.translatorFor(player);
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                List<LikesBroadcast> broadcasts = broadcastRepo.findRecent(FEED_MAX_ITEMS);
+                List<String> ids = broadcasts.stream()
+                        .map(LikesBroadcast::broadcastId)
+                        .toList();
+                Map<String, Long> reactionCounts = ids.isEmpty()
+                        ? Map.of()
+                        : broadcastStatsRepo.reactionCountByBroadcastIds(ids);
+                Set<String> reacted = ids.isEmpty()
+                        ? Set.of()
+                        : eventRepo.reactedBroadcastIds(ids, player.getUniqueId());
+
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    List<Component> pages = feedRenderer.buildPages(
+                            broadcasts, reactionCounts, reacted,
+                            player.getUniqueId(), FEED_ITEMS_PER_PAGE, tr);
+                    openBook(player, tr.translate("likes.command.feed.title"), pages);
+                });
+            } catch (SQLException e) {
+                log.log(Level.WARNING, "Failed to fetch feed data for " + player.getName(), e);
                 plugin.getServer().getScheduler().runTask(plugin,
                         () -> player.sendMessage(Component.text(tr.translate("likes.error.internal"))
                                 .color(NamedTextColor.RED)));

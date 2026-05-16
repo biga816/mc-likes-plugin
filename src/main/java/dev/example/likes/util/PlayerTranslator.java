@@ -29,6 +29,15 @@ public class PlayerTranslator {
     }
 
     /**
+     * Returns the locale bound to this translator.
+     *
+     * @return the player's locale
+     */
+    public Locale locale() {
+        return locale;
+    }
+
+    /**
      * Resolves a translation key for this player's locale.
      * Falls back to the key itself if no translation is registered.
      *

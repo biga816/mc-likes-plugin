@@ -78,15 +78,21 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            player.sendMessage(messageFactory.usageInfo("like", "displaycode", "list", "ranking", "mine"));
+            player.sendMessage(messageFactory.usageInfo("like", "displaycode", "feed", "log", "ranking", "mine"));
             return true;
         }
 
         String first = args[0];
 
-        // /like list
-        if (first.equalsIgnoreCase("list")) {
-            handleList(player);
+        // /like feed — book UI (recent likes feed)
+        if (first.equalsIgnoreCase("feed")) {
+            bookService.openFeedBook(player);
+            return true;
+        }
+
+        // /like log — chat list (replaces /like list)
+        if (first.equalsIgnoreCase("log")) {
+            handleLog(player);
             return true;
         }
 
@@ -130,11 +136,11 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void handleList(Player player) {
+    private void handleLog(Player player) {
         List<LikesBroadcast> recent = recentService.getRecent(5);
 
         if (recent.isEmpty()) {
-            player.sendMessage(messageFactory.info("likes.recent.empty"));
+            player.sendMessage(messageFactory.info("likes.command.log.empty"));
             return;
         }
 
@@ -150,7 +156,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             log.log(Level.WARNING, "Failed to get reaction data for recent broadcasts", e);
         }
 
-        player.sendMessage(messageFactory.info("likes.recent.title"));
+        player.sendMessage(messageFactory.info("likes.command.log.title"));
         for (LikesBroadcast broadcast : recent) {
             boolean isOwnSend = broadcast.sourceSenderUuid().equals(player.getUniqueId());
             Component senderDisplay = isOwnSend
@@ -162,8 +168,8 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
                     : Component.text(resolveName(broadcast.targetUuid())).color(NamedTextColor.WHITE);
             int count = countMap.getOrDefault(broadcast.broadcastId(), 0L).intValue();
             boolean alreadyReacted = reactedIds.contains(broadcast.broadcastId());
-            Component msg = messageFactory.buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, count,
-                    alreadyReacted, true, !isOwnLike);
+            Component msg = messageFactory.buildLogBroadcastMessage(broadcast, senderDisplay, targetDisplay, count,
+                    alreadyReacted, !isOwnLike);
             player.sendMessage(msg);
         }
 
@@ -186,8 +192,10 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             List<String> suggestions = new ArrayList<>();
 
             // Subcommands
-            if ("list".startsWith(partial))
-                suggestions.add("list");
+            if ("feed".startsWith(partial))
+                suggestions.add("feed");
+            if ("log".startsWith(partial))
+                suggestions.add("log");
             if ("ranking".startsWith(partial))
                 suggestions.add("ranking");
             if ("mine".startsWith(partial))

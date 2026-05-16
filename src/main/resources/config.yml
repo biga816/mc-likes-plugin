@@ -16,3 +16,7 @@ broadcast:
   enabled: true
   prefix: "[LIKE]"
   showShortIdInHover: true
+
+feed:
+  maxItems: 40
+  itemsPerPage: 4

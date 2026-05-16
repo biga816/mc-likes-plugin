@@ -32,7 +32,7 @@ public class LikeRankingBookRenderer {
         private static final int MAX_NAME_LEN = 10;
 
         /** Max reason characters shown on popular likes entries. */
-        private static final int MAX_REASON_LEN = 18;
+        private static final int MAX_REASON_LEN = 17;
 
         /** Max entries shown on the Popular Likes page (2-line format). */
         private static final int MAX_POPULAR_ENTRIES = 5;
@@ -162,7 +162,7 @@ public class LikeRankingBookRenderer {
                                 b.append(buildClickableHeart(code, entry.reactionCount(), alreadyReacted, isViewer,
                                                 tr));
                                 b.append(Component.newline());
-                                b.append(Component.text("   " + reason)
+                                b.append(Component.text("   \"" + reason + "\"")
                                                 .color(NamedTextColor.GRAY)
                                                 .hoverEvent(HoverEvent.showText(
                                                                 Component.text(entry.reasonText() != null
