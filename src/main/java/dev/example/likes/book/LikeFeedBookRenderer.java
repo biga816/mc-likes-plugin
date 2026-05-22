@@ -5,11 +5,8 @@ import dev.example.likes.util.PlayerTranslator;
 import dev.example.likes.util.RelativeTimeFormatter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -96,21 +93,14 @@ public class LikeFeedBookRenderer {
                 LikesBroadcast bc = pageItems.get(i);
 
                 String timeStr = RelativeTimeFormatter.format(bc.createdAt(), tr);
-                String senderName = truncate(resolveName(bc.sourceSenderUuid()), MAX_NAME_LEN);
-                String targetName = truncate(resolveName(bc.targetUuid()), MAX_NAME_LEN);
-                String reason = truncate(bc.reasonText(), MAX_REASON_LEN);
+                String senderName = BookComponents.truncate(BookComponents.resolveName(bc.sourceSenderUuid()), MAX_NAME_LEN);
+                String targetName = BookComponents.truncate(BookComponents.resolveName(bc.targetUuid()), MAX_NAME_LEN);
+                String reason = BookComponents.truncate(bc.reasonText(), MAX_REASON_LEN);
                 long count = reactionCounts.getOrDefault(bc.broadcastId(), 0L);
                 String code = bc.displayCode();
                 boolean alreadyReacted = reactedBroadcasts.contains(bc.broadcastId());
                 boolean isViewer = bc.sourceSenderUuid().equals(viewerUuid)
                         || bc.targetUuid().equals(viewerUuid);
-
-                NamedTextColor senderColor = bc.sourceSenderUuid().equals(viewerUuid)
-                        ? NamedTextColor.GREEN
-                        : NamedTextColor.BLACK;
-                NamedTextColor targetColor = bc.targetUuid().equals(viewerUuid)
-                        ? NamedTextColor.GREEN
-                        : NamedTextColor.BLACK;
 
                 // Line 1: relative time
                 b.append(Component.text(timeStr).color(NamedTextColor.DARK_GRAY)
@@ -118,19 +108,15 @@ public class LikeFeedBookRenderer {
                 b.append(Component.newline());
 
                 // Line 2: sender→target [♡count]
-                b.append(Component.text("  " + senderName).color(senderColor));
-                b.append(Component.text("→").color(NamedTextColor.RED));
-                b.append(Component.text(targetName + " ").color(targetColor));
-                b.append(LikeRankingBookRenderer.buildClickableHeart(
-                        code, count, alreadyReacted, isViewer, tr));
+                b.append(Component.text("  "));
+                b.append(BookComponents.buildSenderArrowTarget(
+                        senderName, BookComponents.nameColor(bc.sourceSenderUuid(), viewerUuid),
+                        targetName, BookComponents.nameColor(bc.targetUuid(), viewerUuid)));
+                b.append(BookComponents.buildClickableHeart(code, count, alreadyReacted, isViewer, tr));
                 b.append(Component.newline());
 
                 // Line 3: reason (truncated inline, full text on hover)
-                b.append(Component.text("  \"" + reason + "\"")
-                        .color(NamedTextColor.GRAY)
-                        .hoverEvent(HoverEvent.showText(
-                                Component.text(bc.reasonText() != null ? bc.reasonText() : "")
-                                        .color(NamedTextColor.GRAY))));
+                b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "  "));
 
                 // Blank separator between entries (not after the last one on the page)
                 if (i < pageItems.size() - 1) {
@@ -142,23 +128,5 @@ public class LikeFeedBookRenderer {
         }
 
         return pages;
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private static String truncate(String text, int max) {
-        if (text == null)
-            return "";
-        if (text.length() <= max)
-            return text;
-        return text.substring(0, Math.max(0, max - 2)) + "..";
-    }
-
-    private static String resolveName(UUID uuid) {
-        Player online = Bukkit.getPlayer(uuid);
-        if (online != null)
-            return online.getName();
-        String name = Bukkit.getOfflinePlayer(uuid).getName();
-        return name != null ? name : uuid.toString().substring(0, 8);
     }
 }

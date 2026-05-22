@@ -64,7 +64,6 @@ public class MessageFactory {
                         .atZone(ZoneId.systemDefault()))
                 + "]";
 
-        String displayCode = broadcast.displayCode();
         Component message = Component.text(dateLabel + " ")
                 .color(NamedTextColor.AQUA)
                 .append(senderDisplay)
@@ -73,26 +72,7 @@ public class MessageFactory {
                 .append(Component.newline())
                 .append(Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
 
-        String heart = alreadyReacted ? "♥" : "♡";
-        String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
-        Component reactButton = Component.text("[" + heart + count + "]").color(NamedTextColor.GRAY);
-        Component codeLabel = Component.text("(#" + displayCode + ")").color(NamedTextColor.DARK_GRAY)
-                .decorate(TextDecoration.ITALIC);
-
-        if (alreadyReacted) {
-            reactButton = reactButton.color(NamedTextColor.RED);
-        } else if (clickable) {
-            reactButton = reactButton
-                    .decorate(TextDecoration.UNDERLINED)
-                    .clickEvent(ClickEvent.runCommand("/like #" + displayCode))
-                    .hoverEvent(HoverEvent.showText(
-                            Component.translatable("likes.broadcast.react.hover")
-                                    .append(Component.text("\n#"))
-                                    .append(Component.text(displayCode).color(NamedTextColor.WHITE))));
-            codeLabel = codeLabel.color(NamedTextColor.WHITE);
-        }
-
-        return message.append(Component.text("  ")).append(reactButton).append(Component.text("  ")).append(codeLabel);
+        return message.append(buildReactSuffix(broadcast.displayCode(), reactionCount, alreadyReacted, clickable));
     }
 
     /**
@@ -148,6 +128,10 @@ public class MessageFactory {
             return message;
         }
 
+        return message.append(buildReactSuffix(displayCode, reactionCount, alreadyReacted, clickable));
+    }
+
+    private Component buildReactSuffix(String displayCode, int reactionCount, boolean alreadyReacted, boolean clickable) {
         String heart = alreadyReacted ? "♥" : "♡";
         String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
         Component reactButton = Component.text("[" + heart + count + "]").color(NamedTextColor.GRAY);
@@ -158,7 +142,6 @@ public class MessageFactory {
             reactButton = reactButton.color(NamedTextColor.RED);
         } else if (clickable) {
             reactButton = reactButton
-                    .color(NamedTextColor.GRAY)
                     .decorate(TextDecoration.UNDERLINED)
                     .clickEvent(ClickEvent.runCommand("/like #" + displayCode))
                     .hoverEvent(HoverEvent.showText(
@@ -168,7 +151,7 @@ public class MessageFactory {
             codeLabel = codeLabel.color(NamedTextColor.WHITE);
         }
 
-        return message.append(Component.text("  ")).append(reactButton).append(Component.text("  ")).append(codeLabel);
+        return Component.text("  ").append(reactButton).append(Component.text("  ")).append(codeLabel);
     }
 
     /**

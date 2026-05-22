@@ -5,17 +5,14 @@ import dev.example.likes.model.LikePlayerStats;
 import dev.example.likes.util.PlayerTranslator;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.ToLongFunction;
 
 /**
  * Builds the 3-page book for {@code /like ranking}.
@@ -72,24 +69,7 @@ public class LikeRankingBookRenderer {
                 b.append(Component.text(tr.translate("likes.book.ranking.received"))
                                 .color(NamedTextColor.DARK_GRAY)
                                 .decorate(TextDecoration.BOLD));
-
-                if (list.isEmpty()) {
-                        b.append(Component.newline());
-                        b.append(Component.newline());
-                        b.append(Component.text(tr.translate("likes.book.ranking.empty"))
-                                        .color(NamedTextColor.GRAY));
-                } else {
-                        for (int i = 0; i < list.size(); i++) {
-                                LikePlayerStats s = list.get(i);
-                                b.append(Component.newline());
-                                b.append(Component.text((i + 1) + ". ")
-                                                .color(NamedTextColor.DARK_GRAY));
-                                b.append(Component.text(truncate(s.playerName(), MAX_NAME_LEN))
-                                                .color(NamedTextColor.BLACK));
-                                b.append(Component.text("  ♥" + s.receivedCount())
-                                                .color(NamedTextColor.RED));
-                        }
-                }
+                appendPlayerStatsList(b, list, LikePlayerStats::receivedCount, tr);
                 return b.build();
         }
 
@@ -98,24 +78,7 @@ public class LikeRankingBookRenderer {
                 b.append(Component.text(tr.translate("likes.book.ranking.sent"))
                                 .color(NamedTextColor.DARK_GRAY)
                                 .decorate(TextDecoration.BOLD));
-
-                if (list.isEmpty()) {
-                        b.append(Component.newline());
-                        b.append(Component.newline());
-                        b.append(Component.text(tr.translate("likes.book.ranking.empty"))
-                                        .color(NamedTextColor.GRAY));
-                } else {
-                        for (int i = 0; i < list.size(); i++) {
-                                LikePlayerStats s = list.get(i);
-                                b.append(Component.newline());
-                                b.append(Component.text((i + 1) + ". ")
-                                                .color(NamedTextColor.DARK_GRAY));
-                                b.append(Component.text(truncate(s.playerName(), MAX_NAME_LEN))
-                                                .color(NamedTextColor.BLACK));
-                                b.append(Component.text("  ♥" + s.sentCount())
-                                                .color(NamedTextColor.RED));
-                        }
-                }
+                appendPlayerStatsList(b, list, LikePlayerStats::sentCount, tr);
                 return b.build();
         }
 
@@ -135,40 +98,23 @@ public class LikeRankingBookRenderer {
                         int limit = Math.min(list.size(), MAX_POPULAR_ENTRIES);
                         for (int i = 0; i < limit; i++) {
                                 BroadcastRankingEntry entry = list.get(i);
-                                String senderName = truncate(resolveName(entry.sourceSenderUuid()), 7);
-                                String targetName = truncate(resolveName(entry.targetUuid()), 7);
-                                String reason = truncate(entry.reasonText(), MAX_REASON_LEN);
+                                String senderName = BookComponents.truncate(BookComponents.resolveName(entry.sourceSenderUuid()), 7);
+                                String targetName = BookComponents.truncate(BookComponents.resolveName(entry.targetUuid()), 7);
+                                String reason = BookComponents.truncate(entry.reasonText(), MAX_REASON_LEN);
                                 String code = entry.displayCode();
                                 boolean alreadyReacted = reactedBroadcastIds.contains(entry.broadcastId());
                                 boolean isViewer = entry.sourceSenderUuid().equals(viewerUuid)
                                                 || entry.targetUuid().equals(viewerUuid);
 
-                                NamedTextColor senderColor = entry.sourceSenderUuid().equals(viewerUuid)
-                                                ? NamedTextColor.GREEN
-                                                : NamedTextColor.BLACK;
-                                NamedTextColor targetColor = entry.targetUuid().equals(viewerUuid)
-                                                ? NamedTextColor.GREEN
-                                                : NamedTextColor.BLACK;
-
                                 b.append(Component.newline());
                                 b.append(Component.text((i + 1) + ". ")
                                                 .color(NamedTextColor.DARK_GRAY));
-                                b.append(Component.text(senderName)
-                                                .color(senderColor));
-                                b.append(Component.text("→")
-                                                .color(NamedTextColor.RED));
-                                b.append(Component.text(targetName + " ")
-                                                .color(targetColor));
-                                b.append(buildClickableHeart(code, entry.reactionCount(), alreadyReacted, isViewer,
-                                                tr));
+                                b.append(BookComponents.buildSenderArrowTarget(
+                                                senderName, BookComponents.nameColor(entry.sourceSenderUuid(), viewerUuid),
+                                                targetName, BookComponents.nameColor(entry.targetUuid(), viewerUuid)));
+                                b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted, isViewer, tr));
                                 b.append(Component.newline());
-                                b.append(Component.text("   \"" + reason + "\"")
-                                                .color(NamedTextColor.GRAY)
-                                                .hoverEvent(HoverEvent.showText(
-                                                                Component.text(entry.reasonText() != null
-                                                                                ? entry.reasonText()
-                                                                                : "")
-                                                                                .color(NamedTextColor.GRAY))));
+                                b.append(BookComponents.buildReasonLine(entry.reasonText(), reason, "   "));
                         }
                 }
                 return b.build();
@@ -176,40 +122,23 @@ public class LikeRankingBookRenderer {
 
         // ── Shared helpers ────────────────────────────────────────────────────────
 
-        /**
-         * Builds a clickable heart+count component.
-         * Clicking runs {@code /like #<code>}; hovering shows a translated tooltip.
-         *
-         * @param code  the 4-character display code (without {@code #})
-         * @param count current reaction count
-         * @param tr    locale-bound translator for the hover tooltip
-         * @return the styled, clickable component
-         */
-        static Component buildClickableHeart(String code, long count, boolean alreadyReacted, boolean isViewer,
-                        PlayerTranslator tr) {
-                String symbol = alreadyReacted ? "♥" : "♡";
-                Component heart = Component.text("[" + symbol + count + "]").color(NamedTextColor.RED);
-                if (!alreadyReacted && !isViewer) {
-                        heart = heart
-                                        .decorate(TextDecoration.UNDERLINED)
-                                        .clickEvent(ClickEvent.runCommand("/like #" + code));
+        private void appendPlayerStatsList(TextComponent.Builder b, List<LikePlayerStats> list,
+                        ToLongFunction<LikePlayerStats> countExtractor, PlayerTranslator tr) {
+                if (list.isEmpty()) {
+                        b.append(Component.newline());
+                        b.append(Component.newline());
+                        b.append(Component.text(tr.translate("likes.book.ranking.empty"))
+                                        .color(NamedTextColor.GRAY));
+                } else {
+                        for (int i = 0; i < list.size(); i++) {
+                                LikePlayerStats s = list.get(i);
+                                b.append(Component.newline());
+                                b.append(Component.text((i + 1) + ". ").color(NamedTextColor.DARK_GRAY));
+                                b.append(Component.text(BookComponents.truncate(s.playerName(), MAX_NAME_LEN))
+                                                .color(NamedTextColor.BLACK));
+                                b.append(Component.text("  ♥" + countExtractor.applyAsLong(s))
+                                                .color(NamedTextColor.RED));
+                        }
                 }
-                return Component.text("").color(NamedTextColor.RED).append(heart);
-        }
-
-        private static String truncate(String text, int max) {
-                if (text == null)
-                        return "";
-                if (text.length() <= max)
-                        return text;
-                return text.substring(0, Math.max(0, max - 2)) + "..";
-        }
-
-        private static String resolveName(UUID uuid) {
-                Player online = Bukkit.getPlayer(uuid);
-                if (online != null)
-                        return online.getName();
-                String name = Bukkit.getOfflinePlayer(uuid).getName();
-                return name != null ? name : uuid.toString().substring(0, 8);
         }
 }

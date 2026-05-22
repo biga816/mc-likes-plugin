@@ -5,16 +5,12 @@ import dev.example.likes.model.LikesBroadcast;
 import dev.example.likes.util.PlayerTranslator;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Builds the 3-page book for {@code /like mine}.
@@ -125,23 +121,9 @@ public class LikeMineBookRenderer {
             b.append(Component.text(tr.translate("likes.book.empty")).color(NamedTextColor.GRAY));
         } else {
             for (int i = 0; i < list.size(); i++) {
-                LikesBroadcast bc = list.get(i);
-                String senderName = resolveName(bc.sourceSenderUuid());
-                String reason = truncate(bc.reasonText(), MAX_REASON_LEN);
-                long count = reactionCounts.getOrDefault(bc.broadcastId(), 0L);
-
                 b.append(Component.newline());
-                b.append(Component.text((i + 1) + ". ")
-                        .color(NamedTextColor.DARK_GRAY));
-                b.append(Component.text(truncate(senderName, MAX_NAME_LEN))
-                        .color(NamedTextColor.BLACK));
-                b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
-                b.append(Component.newline());
-                b.append(Component.text("   \"" + reason + "\"")
-                        .color(NamedTextColor.GRAY)
-                        .hoverEvent(HoverEvent.showText(
-                                Component.text(bc.reasonText() != null ? bc.reasonText() : "")
-                                        .color(NamedTextColor.GRAY))));
+                b.append(Component.text((i + 1) + ". ").color(NamedTextColor.DARK_GRAY));
+                appendBroadcastEntry(b, list.get(i), reactionCounts, /* showSender */ true);
             }
         }
         return b.build();
@@ -161,23 +143,9 @@ public class LikeMineBookRenderer {
             b.append(Component.text(tr.translate("likes.book.empty")).color(NamedTextColor.GRAY));
         } else {
             for (int i = 0; i < list.size(); i++) {
-                LikesBroadcast bc = list.get(i);
-                String targetName = resolveName(bc.targetUuid());
-                String reason = truncate(bc.reasonText(), MAX_REASON_LEN);
-                long count = reactionCounts.getOrDefault(bc.broadcastId(), 0L);
-
                 b.append(Component.newline());
-                b.append(Component.text((i + 1) + ". ")
-                        .color(NamedTextColor.DARK_GRAY));
-                b.append(Component.text(truncate(targetName, MAX_NAME_LEN))
-                        .color(NamedTextColor.BLACK));
-                b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
-                b.append(Component.newline());
-                b.append(Component.text("   \"" + reason + "\"")
-                        .color(NamedTextColor.GRAY)
-                        .hoverEvent(HoverEvent.showText(
-                                Component.text(bc.reasonText() != null ? bc.reasonText() : "")
-                                        .color(NamedTextColor.GRAY))));
+                b.append(Component.text((i + 1) + ". ").color(NamedTextColor.DARK_GRAY));
+                appendBroadcastEntry(b, list.get(i), reactionCounts, /* showSender */ false);
             }
         }
         return b.build();
@@ -188,35 +156,15 @@ public class LikeMineBookRenderer {
     private void appendBroadcastEntry(TextComponent.Builder b, LikesBroadcast bc,
             Map<String, Long> reactionCounts, boolean showSender) {
         String name = showSender
-                ? resolveName(bc.sourceSenderUuid())
-                : resolveName(bc.targetUuid());
-        String reason = truncate(bc.reasonText(), MAX_REASON_LEN);
+                ? BookComponents.resolveName(bc.sourceSenderUuid())
+                : BookComponents.resolveName(bc.targetUuid());
+        String reason = BookComponents.truncate(bc.reasonText(), MAX_REASON_LEN);
         long count = reactionCounts.getOrDefault(bc.broadcastId(), 0L);
 
-        b.append(Component.text(truncate(name, MAX_NAME_LEN))
+        b.append(Component.text(BookComponents.truncate(name, MAX_NAME_LEN))
                 .color(NamedTextColor.BLACK));
         b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
         b.append(Component.newline());
-        b.append(Component.text("   \"" + reason + "\"")
-                .color(NamedTextColor.GRAY)
-                .hoverEvent(HoverEvent.showText(
-                        Component.text(bc.reasonText() != null ? bc.reasonText() : "")
-                                .color(NamedTextColor.GRAY))));
-    }
-
-    private static String truncate(String text, int max) {
-        if (text == null)
-            return "";
-        if (text.length() <= max)
-            return text;
-        return text.substring(0, Math.max(0, max - 2)) + "..";
-    }
-
-    private static String resolveName(UUID uuid) {
-        Player online = Bukkit.getPlayer(uuid);
-        if (online != null)
-            return online.getName();
-        String name = Bukkit.getOfflinePlayer(uuid).getName();
-        return name != null ? name : uuid.toString().substring(0, 8);
+        b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "   "));
     }
 }
