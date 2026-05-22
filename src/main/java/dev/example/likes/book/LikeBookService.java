@@ -50,7 +50,7 @@ public class LikeBookService {
     private static final int POPULAR_LIMIT = 10;
 
     /** Number of broadcasts shown on each mine received/sent page. */
-    private static final int MINE_LIMIT = 5;
+    private static final int MINE_LIMIT = 6;
 
     /** Maximum number of broadcasts loaded for the feed. */
     private static final int FEED_MAX_ITEMS = 40;

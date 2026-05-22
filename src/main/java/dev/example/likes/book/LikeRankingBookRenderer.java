@@ -32,7 +32,7 @@ public class LikeRankingBookRenderer {
         private static final int MAX_REASON_LEN = 17;
 
         /** Max entries shown on the Popular Likes page (2-line format). */
-        private static final int MAX_POPULAR_ENTRIES = 5;
+        private static final int MAX_POPULAR_ENTRIES = 6;
 
         /**
          * Builds all pages for the ranking book.
@@ -98,8 +98,10 @@ public class LikeRankingBookRenderer {
                         int limit = Math.min(list.size(), MAX_POPULAR_ENTRIES);
                         for (int i = 0; i < limit; i++) {
                                 BroadcastRankingEntry entry = list.get(i);
-                                String senderName = BookComponents.truncate(BookComponents.resolveName(entry.sourceSenderUuid()), 7);
-                                String targetName = BookComponents.truncate(BookComponents.resolveName(entry.targetUuid()), 7);
+                                String senderName = BookComponents
+                                                .truncate(BookComponents.resolveName(entry.sourceSenderUuid()), 7);
+                                String targetName = BookComponents
+                                                .truncate(BookComponents.resolveName(entry.targetUuid()), 7);
                                 String reason = BookComponents.truncate(entry.reasonText(), MAX_REASON_LEN);
                                 String code = entry.displayCode();
                                 boolean alreadyReacted = reactedBroadcastIds.contains(entry.broadcastId());
@@ -110,11 +112,13 @@ public class LikeRankingBookRenderer {
                                 b.append(Component.text((i + 1) + ". ")
                                                 .color(NamedTextColor.DARK_GRAY));
                                 b.append(BookComponents.buildSenderArrowTarget(
-                                                senderName, BookComponents.nameColor(entry.sourceSenderUuid(), viewerUuid),
+                                                senderName,
+                                                BookComponents.nameColor(entry.sourceSenderUuid(), viewerUuid),
                                                 targetName, BookComponents.nameColor(entry.targetUuid(), viewerUuid)));
-                                b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted, isViewer, tr));
+                                b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted,
+                                                isViewer, tr));
                                 b.append(Component.newline());
-                                b.append(BookComponents.buildReasonLine(entry.reasonText(), reason, "   "));
+                                b.append(BookComponents.buildReasonLine(entry.reasonText(), reason, "   ", entry.createdAt()));
                         }
                 }
                 return b.build();

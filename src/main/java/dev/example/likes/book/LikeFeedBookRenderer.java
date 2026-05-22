@@ -116,7 +116,7 @@ public class LikeFeedBookRenderer {
                 b.append(Component.newline());
 
                 // Line 3: reason (truncated inline, full text on hover)
-                b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "  "));
+                b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "  ", bc.createdAt()));
 
                 // Blank separator between entries (not after the last one on the page)
                 if (i < pageItems.size() - 1) {

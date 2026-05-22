@@ -165,6 +165,6 @@ public class LikeMineBookRenderer {
                 .color(NamedTextColor.BLACK));
         b.append(Component.text("  ♥" + count + " ").color(NamedTextColor.RED));
         b.append(Component.newline());
-        b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "   "));
+        b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "   ", bc.createdAt()));
     }
 }

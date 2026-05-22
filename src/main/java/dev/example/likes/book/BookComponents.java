@@ -9,6 +9,9 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 /**
@@ -19,7 +22,8 @@ class BookComponents {
     private BookComponents() {}
 
     /**
-     * Truncates {@code text} to at most {@code max} characters,
+     * Truncates {@code text} 
+    to at most {@code max} characters,
      * appending {@code ".."} when truncated.
      */
     static String truncate(String text, int max) {
@@ -90,20 +94,27 @@ class BookComponents {
                 .append(Component.text(targetName + " ").color(targetColor));
     }
 
+
+    private static final DateTimeFormatter REASON_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     /**
      * Builds a reason line that shows truncated text inline and the full
-     * text on hover.
+     * text with creation date on hover.
      *
      * @param fullText  the full reason text shown on hover
      * @param truncated the truncated text shown inline
      * @param indent    leading whitespace prefix (e.g. {@code "  "} or {@code "   "})
+     * @param createdAt broadcast creation timestamp in epoch milliseconds
      * @return the styled component
      */
-    static Component buildReasonLine(String fullText, String truncated, String indent) {
+    static Component buildReasonLine(String fullText, String truncated, String indent, long createdAt) {
+        String dateLabel = "[" + REASON_DATE_FORMAT.format(
+                Instant.ofEpochMilli(createdAt).atZone(ZoneId.systemDefault())) + "]";
         return Component.text(indent + "\"" + truncated + "\"")
                 .color(NamedTextColor.GRAY)
                 .hoverEvent(HoverEvent.showText(
-                        Component.text(fullText != null ? fullText : "")
-                                .color(NamedTextColor.GRAY)));
+                        Component.text(dateLabel).color(NamedTextColor.DARK_GRAY)
+                                .append(Component.newline())
+                                .append(Component.text(fullText != null ? fullText : "").color(NamedTextColor.GRAY))));
     }
 }
