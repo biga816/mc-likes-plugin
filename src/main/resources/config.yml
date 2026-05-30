@@ -20,3 +20,6 @@ broadcast:
 feed:
   maxItems: 40
   itemsPerPage: 4
+
+effects:
+  enabled: true

@@ -52,6 +52,7 @@ public class LikeService {
     private final CooldownService cooldownService;
     private final RecentService recentService;
     private final MessageFactory messageFactory;
+    private final LikeEffectService effectService;
     private final FileConfiguration config;
     private final Plugin plugin;
 
@@ -70,6 +71,7 @@ public class LikeService {
             CooldownService cooldownService,
             RecentService recentService,
             MessageFactory messageFactory,
+            LikeEffectService effectService,
             FileConfiguration config,
             Plugin plugin) {
         this.broadcastRepository = broadcastRepository;
@@ -83,6 +85,7 @@ public class LikeService {
         this.cooldownService = cooldownService;
         this.recentService = recentService;
         this.messageFactory = messageFactory;
+        this.effectService = effectService;
         this.config = config;
         this.plugin = plugin;
     }
@@ -229,6 +232,11 @@ public class LikeService {
                 targetOnline.sendMessage(messageFactory.buildBroadcastMessage(
                         broadcast, senderDisplay, youDisplay));
             }
+
+            // Particle effects (success only; exceptions must not fail the like)
+            if (senderOnline != null && targetOnline != null) {
+                effectService.showDirectLikeEffect(senderOnline, targetOnline);
+            }
         }));
     }
 
@@ -365,6 +373,12 @@ public class LikeService {
 
             // Update lastSeen
             recentService.updateLastSeen(senderUuid, broadcast.broadcastId());
+
+            // Particle effects (success only; exceptions must not fail the reaction)
+            Player targetOnline = Bukkit.getPlayer(broadcast.targetUuid());
+            if (senderOnline != null) {
+                effectService.showReactionEffect(senderOnline, targetOnline);
+            }
         }));
     }
 

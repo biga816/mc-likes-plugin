@@ -69,7 +69,6 @@ public class MessageFactory {
                 .append(senderDisplay)
                 .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
                 .append(targetDisplay)
-                .append(Component.newline())
                 .append(Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
 
         return message.append(buildReactSuffix(broadcast.displayCode(), reactionCount, alreadyReacted, clickable));
@@ -131,7 +130,8 @@ public class MessageFactory {
         return message.append(buildReactSuffix(displayCode, reactionCount, alreadyReacted, clickable));
     }
 
-    private Component buildReactSuffix(String displayCode, int reactionCount, boolean alreadyReacted, boolean clickable) {
+    private Component buildReactSuffix(String displayCode, int reactionCount, boolean alreadyReacted,
+            boolean clickable) {
         String heart = alreadyReacted ? "♥" : "♡";
         String count = reactionCount < 0 ? "" : String.valueOf(reactionCount);
         Component reactButton = Component.text("[" + heart + count + "]").color(NamedTextColor.GRAY);

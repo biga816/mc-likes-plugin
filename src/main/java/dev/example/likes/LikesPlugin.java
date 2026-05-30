@@ -10,6 +10,7 @@ import dev.example.likes.database.DatabaseWriteExecutor;
 import dev.example.likes.database.EventRepository;
 import dev.example.likes.database.PlayerStatsRepository;
 import dev.example.likes.service.CooldownService;
+import dev.example.likes.service.LikeEffectService;
 import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
 import dev.example.likes.util.I18nService;
@@ -35,6 +36,8 @@ public class LikesPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        getConfig().options().copyDefaults(true);
+        saveConfig();
 
         // 1. Initialize i18n translations
         i18nService = new I18nService();
@@ -78,13 +81,14 @@ public class LikesPlugin extends JavaPlugin {
 
         DisplayCodeGenerator displayCodeGen = new DisplayCodeGenerator(broadcastRepo);
         MessageFactory messageFactory = new MessageFactory(getConfig());
+        LikeEffectService effectService = new LikeEffectService(getConfig());
 
         LikeService likeService = new LikeService(
                 broadcastRepo, eventRepo, dailyRepo,
                 playerStatsRepo, broadcastStatsRepo,
                 databaseManager, writeExecutor,
                 displayCodeGen, cooldownService, recentService, messageFactory,
-                getConfig(), this);
+                effectService, getConfig(), this);
 
         // 6. Book UI service
         LikeBookService bookService = new LikeBookService(
