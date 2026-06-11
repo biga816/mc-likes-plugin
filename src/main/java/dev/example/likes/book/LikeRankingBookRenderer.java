@@ -66,7 +66,7 @@ public class LikeRankingBookRenderer {
                                 .decorate(TextDecoration.BOLD));
                 b.append(Component.newline());
                 b.append(Component.newline());
-                b.append(Component.text(tr.translate("likes.book.ranking.received"))
+                b.append(Component.text("⏷" + tr.translate("likes.book.ranking.received"))
                                 .color(NamedTextColor.DARK_GRAY)
                                 .decorate(TextDecoration.BOLD));
                 appendPlayerStatsList(b, list, LikePlayerStats::receivedCount, tr);
@@ -75,7 +75,7 @@ public class LikeRankingBookRenderer {
 
         private Component buildSentPage(List<LikePlayerStats> list, PlayerTranslator tr) {
                 TextComponent.Builder b = Component.text();
-                b.append(Component.text(tr.translate("likes.book.ranking.sent"))
+                b.append(Component.text("⏷" + tr.translate("likes.book.ranking.sent"))
                                 .color(NamedTextColor.DARK_GRAY)
                                 .decorate(TextDecoration.BOLD));
                 appendPlayerStatsList(b, list, LikePlayerStats::sentCount, tr);
@@ -85,7 +85,7 @@ public class LikeRankingBookRenderer {
         private Component buildPopularPage(List<BroadcastRankingEntry> list, UUID viewerUuid,
                         Set<String> reactedBroadcastIds, PlayerTranslator tr) {
                 TextComponent.Builder b = Component.text();
-                b.append(Component.text(tr.translate("likes.book.ranking.popular"))
+                b.append(Component.text("⏷" + tr.translate("likes.book.ranking.popular"))
                                 .color(NamedTextColor.DARK_GRAY)
                                 .decorate(TextDecoration.BOLD));
 
@@ -118,7 +118,8 @@ public class LikeRankingBookRenderer {
                                 b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted,
                                                 isViewer, tr));
                                 b.append(Component.newline());
-                                b.append(BookComponents.buildReasonLine(entry.reasonText(), reason, "   ", entry.createdAt()));
+                                b.append(BookComponents.buildReasonLine(entry.reasonText(), reason, "   ",
+                                                entry.createdAt()));
                         }
                 }
                 return b.build();

@@ -69,7 +69,7 @@ public class MessageFactory {
                 .append(senderDisplay)
                 .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
                 .append(targetDisplay)
-                .append(Component.text("\"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
+                .append(Component.text("  \"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
 
         return message.append(buildReactSuffix(broadcast.displayCode(), reactionCount, alreadyReacted, clickable));
     }

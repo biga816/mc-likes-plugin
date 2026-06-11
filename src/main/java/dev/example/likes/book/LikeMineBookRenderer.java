@@ -67,7 +67,7 @@ public class LikeMineBookRenderer {
         b.append(Component.newline());
 
         // ── Stats section ──────────────────────────────────────────────────
-        b.append(Component.text(tr.translate("likes.book.mine.summary"))
+        b.append(Component.text("⏷" + tr.translate("likes.book.mine.summary"))
                 .color(NamedTextColor.DARK_GRAY)
                 .decorate(TextDecoration.BOLD));
         b.append(Component.newline());
@@ -88,7 +88,7 @@ public class LikeMineBookRenderer {
         // ── Recent received section ────────────────────────────────────────
         b.append(Component.newline());
         b.append(Component.newline());
-        b.append(Component.text(tr.translate("likes.book.mine.recent_received"))
+        b.append(Component.text("⏷" + tr.translate("likes.book.mine.recent_received"))
                 .color(NamedTextColor.DARK_GRAY)
                 .decorate(TextDecoration.BOLD));
 
@@ -111,7 +111,7 @@ public class LikeMineBookRenderer {
             Map<String, Long> reactionCounts,
             PlayerTranslator tr) {
         TextComponent.Builder b = Component.text();
-        b.append(Component.text(tr.translate("likes.book.mine.received_page"))
+        b.append(Component.text("⏷" + tr.translate("likes.book.mine.received_page"))
                 .color(NamedTextColor.DARK_GRAY)
                 .decorate(TextDecoration.BOLD));
 
@@ -133,7 +133,7 @@ public class LikeMineBookRenderer {
             Map<String, Long> reactionCounts,
             PlayerTranslator tr) {
         TextComponent.Builder b = Component.text();
-        b.append(Component.text(tr.translate("likes.book.mine.sent_page"))
+        b.append(Component.text("⏷" + tr.translate("likes.book.mine.sent_page"))
                 .color(NamedTextColor.DARK_GRAY)
                 .decorate(TextDecoration.BOLD));
 
