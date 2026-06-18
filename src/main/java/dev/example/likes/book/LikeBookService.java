@@ -52,6 +52,9 @@ public class LikeBookService {
     /** Number of broadcasts shown on each mine received/sent page. */
     private static final int MINE_LIMIT = 6;
 
+    /** Number of most-liked received broadcasts shown on the mine summary page. */
+    private static final int MOST_LIKED_LIMIT = 3;
+
     /** Maximum number of broadcasts loaded for the feed. */
     private static final int FEED_MAX_ITEMS = 40;
 
@@ -139,6 +142,8 @@ public class LikeBookService {
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 Optional<LikePlayerStats> statsOpt = playerStatsRepo.getPlayerStats(player.getUniqueId());
+                List<BroadcastRankingEntry> mostLiked = broadcastStatsRepo
+                        .getTopLikedBroadcastsReceivedBy(player.getUniqueId(), MOST_LIKED_LIMIT);
                 List<LikesBroadcast> received = broadcastRepo.getRecentBroadcastsReceivedBy(player.getUniqueId(),
                         MINE_LIMIT);
                 List<LikesBroadcast> sent = broadcastRepo.getRecentBroadcastsSentBy(player.getUniqueId(), MINE_LIMIT);
@@ -153,7 +158,8 @@ public class LikeBookService {
                 LikePlayerStats stats = statsOpt.orElse(null);
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    List<Component> pages = mineRenderer.buildPages(stats, received, sent, reactionCounts, tr);
+                    List<Component> pages = mineRenderer.buildPages(stats, mostLiked, received, sent, reactionCounts,
+                            tr);
                     openBook(player, tr.translate("likes.book.mine.title"), pages);
                 });
             } catch (SQLException e) {

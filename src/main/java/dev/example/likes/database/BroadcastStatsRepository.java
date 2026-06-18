@@ -137,7 +137,8 @@ public class BroadcastStatsRepository {
      * @throws SQLException if a database error occurs
      */
     public Map<String, Long> reactionCountByBroadcastIds(List<String> broadcastIds) throws SQLException {
-        if (broadcastIds.isEmpty()) return Map.of();
+        if (broadcastIds.isEmpty())
+            return Map.of();
         String placeholders = broadcastIds.stream().map(id -> "?").collect(Collectors.joining(", "));
         String sql = "SELECT broadcast_id, reaction_count FROM like_broadcast_stats WHERE broadcast_id IN ("
                 + placeholders + ")";
@@ -152,6 +153,49 @@ public class BroadcastStatsRepository {
                     result.put(rs.getString("broadcast_id"), rs.getLong("reaction_count"));
                 }
                 return result;
+            }
+        }
+    }
+
+    /**
+     * Returns the broadcasts received by the given player with the highest
+     * {@code reaction_count} (ties broken by most recent), up to {@code limit}
+     * entries.
+     *
+     * @param playerUuid the recipient's UUID
+     * @param limit      maximum number of results
+     * @return list of ranking entries ordered by reaction_count DESC, created_at DESC
+     * @throws SQLException if a database error occurs
+     */
+    public List<BroadcastRankingEntry> getTopLikedBroadcastsReceivedBy(UUID playerUuid, int limit)
+            throws SQLException {
+        String sql = """
+                SELECT b.broadcast_id, b.display_code, b.created_at,
+                       b.source_sender_uuid, b.target_uuid, b.reason_text,
+                       s.reaction_count
+                FROM likes_broadcasts b
+                JOIN like_broadcast_stats s ON s.broadcast_id = b.broadcast_id
+                WHERE b.target_uuid = ?
+                ORDER BY s.reaction_count DESC, b.created_at DESC
+                LIMIT ?
+                """;
+        Connection conn = databaseManager.getConnection();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<BroadcastRankingEntry> results = new ArrayList<>();
+                while (rs.next()) {
+                    results.add(new BroadcastRankingEntry(
+                            rs.getString("broadcast_id"),
+                            rs.getString("display_code"),
+                            rs.getLong("created_at"),
+                            UUID.fromString(rs.getString("source_sender_uuid")),
+                            UUID.fromString(rs.getString("target_uuid")),
+                            rs.getString("reason_text"),
+                            rs.getLong("reaction_count")));
+                }
+                return results;
             }
         }
     }

@@ -132,6 +132,11 @@ public class DatabaseManager {
                     ON likes_events(broadcast_id, sender_uuid)
                     """);
 
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_target
+                    ON likes_broadcasts(target_uuid)
+                    """);
+
             // ── Indexes on aggregation tables ──────────────────────────────────
 
             stmt.execute("""
