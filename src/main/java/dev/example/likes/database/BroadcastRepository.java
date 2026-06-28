@@ -36,36 +36,45 @@ public class BroadcastRepository {
     public void save(LikesBroadcast broadcast) throws SQLException {
         String sql = """
                 INSERT INTO likes_broadcasts
-                    (broadcast_id, display_code, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (broadcast_id, server_id, display_code, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, broadcast.broadcastId());
-            ps.setString(2, broadcast.displayCode());
-            ps.setLong(3, broadcast.createdAt());
-            ps.setString(4, broadcast.sourceType());
-            ps.setString(5, broadcast.sourceSenderUuid().toString());
-            ps.setString(6, broadcast.targetUuid().toString());
-            ps.setString(7, broadcast.reasonCode());
-            ps.setString(8, broadcast.reasonText());
+            ps.setString(2, broadcast.serverId());
+            ps.setString(3, broadcast.displayCode());
+            ps.setLong(4, broadcast.createdAt());
+            ps.setString(5, broadcast.sourceType());
+            ps.setString(6, broadcast.sourceSenderUuid().toString());
+            ps.setString(7, broadcast.targetUuid().toString());
+            ps.setString(8, broadcast.reasonCode());
+            ps.setString(9, broadcast.reasonText());
             ps.executeUpdate();
         }
     }
 
     /**
-     * Finds the most recent broadcast matching the given displayCode.
+     * Finds the most recent broadcast matching the given serverId and displayCode.
      *
+     * @param serverId    the server ID to scope the lookup
      * @param displayCode the display code to search for
      * @return an Optional containing the most recent matching broadcast, or empty
      *         if not found
      * @throws SQLException if a database operation fails
      */
-    public Optional<LikesBroadcast> findLatestByDisplayCode(String displayCode) throws SQLException {
-        String sql = "SELECT * FROM likes_broadcasts WHERE display_code = ? ORDER BY created_at DESC LIMIT 1";
+    public Optional<LikesBroadcast> findLatestByDisplayCode(String serverId, String displayCode) throws SQLException {
+        String sql = """
+                SELECT * FROM likes_broadcasts
+                WHERE server_id = ?
+                  AND display_code = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, displayCode);
+            ps.setString(1, serverId);
+            ps.setString(2, displayCode);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(mapRow(rs));
@@ -76,17 +85,24 @@ public class BroadcastRepository {
     }
 
     /**
-     * Retrieves recent broadcasts ordered by creation time descending.
+     * Retrieves recent broadcasts for the given server, ordered by creation time descending.
      *
-     * @param limit maximum number of results to return
+     * @param serverId the server ID to filter by
+     * @param limit    maximum number of results to return
      * @return list of broadcasts ordered by created_at DESC
      * @throws SQLException if a database operation fails
      */
-    public List<LikesBroadcast> findRecent(int limit) throws SQLException {
-        String sql = "SELECT * FROM likes_broadcasts ORDER BY created_at DESC LIMIT ?";
+    public List<LikesBroadcast> findRecent(String serverId, int limit) throws SQLException {
+        String sql = """
+                SELECT * FROM likes_broadcasts
+                WHERE server_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, limit);
+            ps.setString(1, serverId);
+            ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<LikesBroadcast> results = new ArrayList<>();
                 while (rs.next()) {
@@ -99,28 +115,33 @@ public class BroadcastRepository {
 
     /**
      * Checks whether a broadcast with the given displayCode exists within the most
-     * recent {@code recentWindow} broadcasts. Used for collision detection during
-     * code
-     * generation.
+     * recent {@code recentWindow} broadcasts for the given server.
      *
+     * @param serverId     the server ID to scope the check
      * @param displayCode  the display code to check
      * @param recentWindow number of most recent broadcasts to search within
      * @return true if a matching broadcast exists in the recent window
      * @throws SQLException if a database operation fails
      */
-    public boolean existsInRecentByDisplayCode(String displayCode, int recentWindow) throws SQLException {
+    public boolean existsInRecentByDisplayCode(String serverId, String displayCode, int recentWindow)
+            throws SQLException {
         String sql = """
                 SELECT 1 FROM likes_broadcasts
-                WHERE display_code = ?
-                AND broadcast_id IN (
-                    SELECT broadcast_id FROM likes_broadcasts ORDER BY created_at DESC LIMIT ?
+                WHERE server_id = ?
+                  AND display_code = ?
+                  AND broadcast_id IN (
+                    SELECT broadcast_id FROM likes_broadcasts
+                    WHERE server_id = ?
+                    ORDER BY created_at DESC LIMIT ?
                 )
                 LIMIT 1
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, displayCode);
-            ps.setInt(2, recentWindow);
+            ps.setString(1, serverId);
+            ps.setString(2, displayCode);
+            ps.setString(3, serverId);
+            ps.setInt(4, recentWindow);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
@@ -131,26 +152,28 @@ public class BroadcastRepository {
 
     /**
      * Returns the most recent broadcasts in which the given player was the
-     * recipient.
-     * Used for the future {@code /like mine} command.
+     * recipient, scoped to the given server.
      *
+     * @param serverId   the server ID to filter by
      * @param playerUuid the recipient's UUID
      * @param limit      maximum number of results
      * @return list of broadcasts ordered by created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<LikesBroadcast> getRecentBroadcastsReceivedBy(UUID playerUuid, int limit)
+    public List<LikesBroadcast> getRecentBroadcastsReceivedBy(String serverId, UUID playerUuid, int limit)
             throws SQLException {
         String sql = """
                 SELECT * FROM likes_broadcasts
-                WHERE target_uuid = ?
+                WHERE server_id = ?
+                  AND target_uuid = ?
                 ORDER BY created_at DESC
                 LIMIT ?
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
-            ps.setInt(2, limit);
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
+            ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<LikesBroadcast> results = new ArrayList<>();
                 while (rs.next()) {
@@ -162,26 +185,29 @@ public class BroadcastRepository {
     }
 
     /**
-     * Returns the most recent broadcasts sent by the given player.
-     * Used for the future {@code /like mine} command.
+     * Returns the most recent broadcasts sent by the given player, scoped to the
+     * given server.
      *
+     * @param serverId   the server ID to filter by
      * @param playerUuid the sender's UUID
      * @param limit      maximum number of results
      * @return list of broadcasts ordered by created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<LikesBroadcast> getRecentBroadcastsSentBy(UUID playerUuid, int limit)
+    public List<LikesBroadcast> getRecentBroadcastsSentBy(String serverId, UUID playerUuid, int limit)
             throws SQLException {
         String sql = """
                 SELECT * FROM likes_broadcasts
-                WHERE source_sender_uuid = ?
+                WHERE server_id = ?
+                  AND source_sender_uuid = ?
                 ORDER BY created_at DESC
                 LIMIT ?
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
-            ps.setInt(2, limit);
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
+            ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<LikesBroadcast> results = new ArrayList<>();
                 while (rs.next()) {
@@ -202,6 +228,7 @@ public class BroadcastRepository {
     private LikesBroadcast mapRow(ResultSet rs) throws SQLException {
         return new LikesBroadcast(
                 rs.getString("broadcast_id"),
+                rs.getString("server_id"),
                 rs.getString("display_code"),
                 rs.getLong("created_at"),
                 rs.getString("source_type"),

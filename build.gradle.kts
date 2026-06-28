@@ -61,5 +61,8 @@ tasks.build {
 tasks.register<Copy>("deployToTestServer") {
     dependsOn(tasks.shadowJar)
     from(tasks.shadowJar.flatMap { it.archiveFile })
+    from("src/main/resources/config.yml") {
+        into("Likes")
+    }
     into(file("./paper-test/plugins"))
 }

@@ -1,3 +1,6 @@
+# Identifier used to separate Like data between servers.
+server-id: default
+
 limits:
   dailyDirectLikeLimit: 20
   pairCooldownSeconds: 60

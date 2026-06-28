@@ -40,11 +40,12 @@ public class RecentService {
      * Data returned by the DB (created_at DESC) is reversed to ascending order
      * before storing.
      *
-     * @param repo the broadcast repository
+     * @param repo     the broadcast repository
+     * @param serverId the server ID used to scope the query
      * @throws SQLException if a database operation fails
      */
-    public void loadFromDb(BroadcastRepository repo) throws SQLException {
-        List<LikesBroadcast> recent = repo.findRecent(bufferSize);
+    public void loadFromDb(BroadcastRepository repo, String serverId) throws SQLException {
+        List<LikesBroadcast> recent = repo.findRecent(serverId, bufferSize);
         // findRecent returns DESC order; reverse to ascending for the buffer
         List<LikesBroadcast> ascending = new ArrayList<>(recent);
         Collections.reverse(ascending);

@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,16 +38,17 @@ public class EventRepository {
     public void save(LikesEvent event) throws SQLException {
         String sql = """
                 INSERT INTO likes_events
-                    (event_id, created_at, broadcast_id, sender_uuid, target_uuid)
-                VALUES (?, ?, ?, ?, ?)
+                    (event_id, server_id, created_at, broadcast_id, sender_uuid, target_uuid)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, event.eventId());
-            ps.setLong(2, event.createdAt());
-            ps.setString(3, event.broadcastId());
-            ps.setString(4, event.senderUuid().toString());
-            ps.setString(5, event.targetUuid().toString());
+            ps.setString(2, event.serverId());
+            ps.setLong(3, event.createdAt());
+            ps.setString(4, event.broadcastId());
+            ps.setString(5, event.senderUuid().toString());
+            ps.setString(6, event.targetUuid().toString());
             ps.executeUpdate();
         }
     }
@@ -73,32 +75,35 @@ public class EventRepository {
     }
 
     /**
-     * Returns recent broadcasts that the given player has reacted to, ordered by
-     * event creation time descending. Used for the future {@code /like mine}
-     * command.
+     * Returns recent broadcasts that the given player has reacted to, scoped to
+     * the given server, ordered by event creation time descending.
      *
+     * @param serverId   the server ID to filter by
      * @param senderUuid the reactor's UUID
      * @param limit      maximum number of results
      * @return list of event records ordered by created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<dev.example.likes.model.LikesEvent> getRecentReactionsBy(UUID senderUuid, int limit)
+    public List<LikesEvent> getRecentReactionsBy(String serverId, UUID senderUuid, int limit)
             throws SQLException {
         String sql = """
                 SELECT * FROM likes_events
-                WHERE sender_uuid = ?
+                WHERE server_id = ?
+                  AND sender_uuid = ?
                 ORDER BY created_at DESC
                 LIMIT ?
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, senderUuid.toString());
-            ps.setInt(2, limit);
+            ps.setString(1, serverId);
+            ps.setString(2, senderUuid.toString());
+            ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                java.util.List<dev.example.likes.model.LikesEvent> results = new java.util.ArrayList<>();
+                List<LikesEvent> results = new ArrayList<>();
                 while (rs.next()) {
-                    results.add(new dev.example.likes.model.LikesEvent(
+                    results.add(new LikesEvent(
                             rs.getString("event_id"),
+                            rs.getString("server_id"),
                             rs.getLong("created_at"),
                             rs.getString("broadcast_id"),
                             UUID.fromString(rs.getString("sender_uuid")),

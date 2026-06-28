@@ -67,6 +67,7 @@ public class LikeBookService {
     private final EventRepository eventRepo;
     private final MessageFactory messageFactory;
     private final JavaPlugin plugin;
+    private final String serverId;
     private final LikeRankingBookRenderer rankingRenderer;
     private final LikeMineBookRenderer mineRenderer;
     private final LikeFeedBookRenderer feedRenderer;
@@ -80,6 +81,7 @@ public class LikeBookService {
      * @param eventRepo          repository for like events (reaction lookups)
      * @param messageFactory     factory used to obtain per-player translators
      * @param plugin             the plugin instance (for scheduler access)
+     * @param serverId           the server ID used to scope all queries
      */
     public LikeBookService(
             PlayerStatsRepository playerStatsRepo,
@@ -87,13 +89,15 @@ public class LikeBookService {
             BroadcastRepository broadcastRepo,
             EventRepository eventRepo,
             MessageFactory messageFactory,
-            JavaPlugin plugin) {
+            JavaPlugin plugin,
+            String serverId) {
         this.playerStatsRepo = playerStatsRepo;
         this.broadcastStatsRepo = broadcastStatsRepo;
         this.broadcastRepo = broadcastRepo;
         this.eventRepo = eventRepo;
         this.messageFactory = messageFactory;
         this.plugin = plugin;
+        this.serverId = serverId;
         this.rankingRenderer = new LikeRankingBookRenderer();
         this.mineRenderer = new LikeMineBookRenderer();
         this.feedRenderer = new LikeFeedBookRenderer();
@@ -109,9 +113,9 @@ public class LikeBookService {
         PlayerTranslator tr = messageFactory.translatorFor(player);
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                List<LikePlayerStats> received = playerStatsRepo.getTopReceivedPlayers(RANKING_LIMIT);
-                List<LikePlayerStats> sent = playerStatsRepo.getTopSentPlayers(RANKING_LIMIT);
-                List<BroadcastRankingEntry> popular = broadcastStatsRepo.getTopBroadcasts(POPULAR_LIMIT);
+                List<LikePlayerStats> received = playerStatsRepo.getTopReceivedPlayers(serverId, RANKING_LIMIT);
+                List<LikePlayerStats> sent = playerStatsRepo.getTopSentPlayers(serverId, RANKING_LIMIT);
+                List<BroadcastRankingEntry> popular = broadcastStatsRepo.getTopBroadcasts(serverId, POPULAR_LIMIT);
                 List<String> popularIds = popular.stream()
                         .map(BroadcastRankingEntry::broadcastId)
                         .toList();
@@ -141,12 +145,13 @@ public class LikeBookService {
         PlayerTranslator tr = messageFactory.translatorFor(player);
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                Optional<LikePlayerStats> statsOpt = playerStatsRepo.getPlayerStats(player.getUniqueId());
+                Optional<LikePlayerStats> statsOpt = playerStatsRepo.getPlayerStats(serverId, player.getUniqueId());
                 List<BroadcastRankingEntry> mostLiked = broadcastStatsRepo
-                        .getTopLikedBroadcastsReceivedBy(player.getUniqueId(), MOST_LIKED_LIMIT);
-                List<LikesBroadcast> received = broadcastRepo.getRecentBroadcastsReceivedBy(player.getUniqueId(),
-                        MINE_LIMIT);
-                List<LikesBroadcast> sent = broadcastRepo.getRecentBroadcastsSentBy(player.getUniqueId(), MINE_LIMIT);
+                        .getTopLikedBroadcastsReceivedBy(serverId, player.getUniqueId(), MOST_LIKED_LIMIT);
+                List<LikesBroadcast> received = broadcastRepo.getRecentBroadcastsReceivedBy(
+                        serverId, player.getUniqueId(), MINE_LIMIT);
+                List<LikesBroadcast> sent = broadcastRepo.getRecentBroadcastsSentBy(
+                        serverId, player.getUniqueId(), MINE_LIMIT);
 
                 List<String> allIds = new ArrayList<>();
                 received.stream().map(LikesBroadcast::broadcastId).forEach(allIds::add);
@@ -181,7 +186,7 @@ public class LikeBookService {
         PlayerTranslator tr = messageFactory.translatorFor(player);
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                List<LikesBroadcast> broadcasts = broadcastRepo.findRecent(FEED_MAX_ITEMS);
+                List<LikesBroadcast> broadcasts = broadcastRepo.findRecent(serverId, FEED_MAX_ITEMS);
                 List<String> ids = broadcasts.stream()
                         .map(LikesBroadcast::broadcastId)
                         .toList();

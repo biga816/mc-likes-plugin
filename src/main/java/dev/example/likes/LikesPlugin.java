@@ -39,11 +39,15 @@ public class LikesPlugin extends JavaPlugin {
         getConfig().options().copyDefaults(true);
         saveConfig();
 
-        // 1. Initialize i18n translations
+        // 1. Read server-id from config
+        String serverId = getConfig().getString("server-id", "default");
+        getLogger().info("Server ID: " + serverId);
+
+        // 2. Initialize i18n translations
         i18nService = new I18nService();
         i18nService.initialize(getClass().getClassLoader());
 
-        // 2. Create data folder and initialize database connection
+        // 3. Create data folder and initialize database connection
         getDataFolder().mkdirs();
         try {
             databaseManager = new DatabaseManager(getDataFolder());
@@ -58,21 +62,21 @@ public class LikesPlugin extends JavaPlugin {
             return;
         }
 
-        // 3. Initialize the single-writer executor
+        // 4. Initialize the single-writer executor
         writeExecutor = new DatabaseWriteExecutor();
 
-        // 4. Initialize repositories
+        // 5. Initialize repositories
         BroadcastRepository broadcastRepo = new BroadcastRepository(databaseManager);
         EventRepository eventRepo = new EventRepository(databaseManager);
         DailyLimitRepository dailyRepo = new DailyLimitRepository(databaseManager);
         PlayerStatsRepository playerStatsRepo = new PlayerStatsRepository(databaseManager);
         BroadcastStatsRepository broadcastStatsRepo = new BroadcastStatsRepository(databaseManager);
 
-        // 5. Initialize services
+        // 6. Initialize services
         CooldownService cooldownService = new CooldownService(getConfig());
         RecentService recentService = new RecentService(getConfig());
         try {
-            recentService.loadFromDb(broadcastRepo);
+            recentService.loadFromDb(broadcastRepo, serverId);
         } catch (SQLException e) {
             getLogger().log(Level.SEVERE, "Failed to load recent broadcasts on startup", e);
             getServer().getPluginManager().disablePlugin(this);
@@ -88,13 +92,13 @@ public class LikesPlugin extends JavaPlugin {
                 playerStatsRepo, broadcastStatsRepo,
                 databaseManager, writeExecutor,
                 displayCodeGen, cooldownService, recentService, messageFactory,
-                effectService, getConfig(), this);
+                effectService, getConfig(), this, serverId);
 
-        // 6. Book UI service
+        // 7. Book UI service
         LikeBookService bookService = new LikeBookService(
-                playerStatsRepo, broadcastStatsRepo, broadcastRepo, eventRepo, messageFactory, this);
+                playerStatsRepo, broadcastStatsRepo, broadcastRepo, eventRepo, messageFactory, this, serverId);
 
-        // 7. Register commands
+        // 8. Register commands
         LikeCommand likeCommand = new LikeCommand(likeService, recentService,
                 broadcastStatsRepo, eventRepo, messageFactory, bookService);
         getCommand("like").setExecutor(likeCommand);

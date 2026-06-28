@@ -37,88 +37,96 @@ public class PlayerStatsRepository {
     // ── Write methods (transactional, called from DatabaseWriteExecutor) ────────
 
     /**
-     * Increments {@code sent_count} for the given player, creating a row if none
-     * exists.
+     * Increments {@code sent_count} for the given player and server, creating a
+     * row if none exists.
      *
      * @param conn       the connection in the active transaction
+     * @param serverId   the server ID for scoping the record
      * @param playerUuid the sender's UUID
      * @param playerName the sender's current display name
      * @param updatedAt  current timestamp in epoch milliseconds
      * @throws SQLException if a database error occurs
      */
-    public void upsertSentCount(Connection conn, UUID playerUuid, String playerName, long updatedAt)
+    public void upsertSentCount(Connection conn, String serverId, UUID playerUuid, String playerName, long updatedAt)
             throws SQLException {
         String sql = """
                 INSERT INTO like_player_stats
-                    (player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
-                VALUES (?, ?, 0, 1, 0, ?)
-                ON CONFLICT(player_uuid) DO UPDATE SET
+                    (server_id, player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
+                VALUES (?, ?, ?, 0, 1, 0, ?)
+                ON CONFLICT(server_id, player_uuid) DO UPDATE SET
                     sent_count   = sent_count + 1,
                     player_name  = excluded.player_name,
                     updated_at   = excluded.updated_at
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
-            ps.setString(2, playerName);
-            ps.setLong(3, updatedAt);
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
+            ps.setString(3, playerName);
+            ps.setLong(4, updatedAt);
             ps.executeUpdate();
         }
     }
 
     /**
-     * Increments {@code received_count} for the given player, creating a row if
-     * none exists.
+     * Increments {@code received_count} for the given player and server, creating
+     * a row if none exists.
      *
      * @param conn       the connection in the active transaction
+     * @param serverId   the server ID for scoping the record
      * @param playerUuid the recipient's UUID
      * @param playerName the recipient's current display name
      * @param updatedAt  current timestamp in epoch milliseconds
      * @throws SQLException if a database error occurs
      */
-    public void upsertReceivedCount(Connection conn, UUID playerUuid, String playerName, long updatedAt)
+    public void upsertReceivedCount(Connection conn, String serverId, UUID playerUuid, String playerName,
+            long updatedAt)
             throws SQLException {
         String sql = """
                 INSERT INTO like_player_stats
-                    (player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
-                VALUES (?, ?, 1, 0, 0, ?)
-                ON CONFLICT(player_uuid) DO UPDATE SET
+                    (server_id, player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
+                VALUES (?, ?, ?, 1, 0, 0, ?)
+                ON CONFLICT(server_id, player_uuid) DO UPDATE SET
                     received_count = received_count + 1,
                     player_name    = excluded.player_name,
                     updated_at     = excluded.updated_at
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
-            ps.setString(2, playerName);
-            ps.setLong(3, updatedAt);
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
+            ps.setString(3, playerName);
+            ps.setLong(4, updatedAt);
             ps.executeUpdate();
         }
     }
 
     /**
-     * Increments {@code reacted_count} for the given player, creating a row if none
-     * exists.
+     * Increments {@code reacted_count} for the given player and server, creating a
+     * row if none exists.
      *
      * @param conn       the connection in the active transaction
+     * @param serverId   the server ID for scoping the record
      * @param playerUuid the reactor's UUID
      * @param playerName the reactor's current display name
      * @param updatedAt  current timestamp in epoch milliseconds
      * @throws SQLException if a database error occurs
      */
-    public void upsertReactedCount(Connection conn, UUID playerUuid, String playerName, long updatedAt)
+    public void upsertReactedCount(Connection conn, String serverId, UUID playerUuid, String playerName,
+            long updatedAt)
             throws SQLException {
         String sql = """
                 INSERT INTO like_player_stats
-                    (player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
-                VALUES (?, ?, 0, 0, 1, ?)
-                ON CONFLICT(player_uuid) DO UPDATE SET
+                    (server_id, player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
+                VALUES (?, ?, ?, 0, 0, 1, ?)
+                ON CONFLICT(server_id, player_uuid) DO UPDATE SET
                     reacted_count = reacted_count + 1,
                     player_name   = excluded.player_name,
                     updated_at    = excluded.updated_at
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
-            ps.setString(2, playerName);
-            ps.setLong(3, updatedAt);
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
+            ps.setString(3, playerName);
+            ps.setLong(4, updatedAt);
             ps.executeUpdate();
         }
     }
@@ -126,17 +134,20 @@ public class PlayerStatsRepository {
     // ── Read methods (for /like mine and /like ranking) ──────────────────────
 
     /**
-     * Returns the stats for a single player, or empty if no record exists yet.
+     * Returns the stats for a single player on the given server, or empty if no
+     * record exists yet.
      *
+     * @param serverId   the server ID to filter by
      * @param playerUuid the player's UUID
      * @return an Optional containing the stats, or empty
      * @throws SQLException if a database error occurs
      */
-    public Optional<LikePlayerStats> getPlayerStats(UUID playerUuid) throws SQLException {
-        String sql = "SELECT * FROM like_player_stats WHERE player_uuid = ?";
+    public Optional<LikePlayerStats> getPlayerStats(String serverId, UUID playerUuid) throws SQLException {
+        String sql = "SELECT * FROM like_player_stats WHERE server_id = ? AND player_uuid = ?";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
             }
@@ -144,47 +155,51 @@ public class PlayerStatsRepository {
     }
 
     /**
-     * Returns the top {@code limit} players ordered by {@code received_count}
-     * descending.
+     * Returns the top {@code limit} players for the given server ordered by
+     * {@code received_count} descending.
      *
-     * @param limit maximum number of results
+     * @param serverId the server ID to filter by
+     * @param limit    maximum number of results
      * @return ordered list of player stats
      * @throws SQLException if a database error occurs
      */
-    public List<LikePlayerStats> getTopReceivedPlayers(int limit) throws SQLException {
-        return queryTop("received_count", limit);
+    public List<LikePlayerStats> getTopReceivedPlayers(String serverId, int limit) throws SQLException {
+        return queryTop(serverId, "received_count", limit);
     }
 
     /**
-     * Returns the top {@code limit} players ordered by {@code sent_count}
-     * descending.
+     * Returns the top {@code limit} players for the given server ordered by
+     * {@code sent_count} descending.
      *
-     * @param limit maximum number of results
+     * @param serverId the server ID to filter by
+     * @param limit    maximum number of results
      * @return ordered list of player stats
      * @throws SQLException if a database error occurs
      */
-    public List<LikePlayerStats> getTopSentPlayers(int limit) throws SQLException {
-        return queryTop("sent_count", limit);
+    public List<LikePlayerStats> getTopSentPlayers(String serverId, int limit) throws SQLException {
+        return queryTop(serverId, "sent_count", limit);
     }
 
     /**
-     * Returns the top {@code limit} players ordered by {@code reacted_count}
-     * descending.
+     * Returns the top {@code limit} players for the given server ordered by
+     * {@code reacted_count} descending.
      *
-     * @param limit maximum number of results
+     * @param serverId the server ID to filter by
+     * @param limit    maximum number of results
      * @return ordered list of player stats
      * @throws SQLException if a database error occurs
      */
-    public List<LikePlayerStats> getTopReactedPlayers(int limit) throws SQLException {
-        return queryTop("reacted_count", limit);
+    public List<LikePlayerStats> getTopReactedPlayers(String serverId, int limit) throws SQLException {
+        return queryTop(serverId, "reacted_count", limit);
     }
 
-    private List<LikePlayerStats> queryTop(String column, int limit) throws SQLException {
+    private List<LikePlayerStats> queryTop(String serverId, String column, int limit) throws SQLException {
         // column is a compile-time constant, not user input — safe to interpolate
-        String sql = "SELECT * FROM like_player_stats ORDER BY " + column + " DESC LIMIT ?";
+        String sql = "SELECT * FROM like_player_stats WHERE server_id = ? ORDER BY " + column + " DESC LIMIT ?";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, limit);
+            ps.setString(1, serverId);
+            ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<LikePlayerStats> results = new ArrayList<>();
                 while (rs.next()) {

@@ -48,18 +48,19 @@ public class DisplayCodeGenerator {
 
     /**
      * Generates a 4-character display code that does not collide with any of
-     * the most recent {@value RECENT_WINDOW} broadcasts in the database.
+     * the most recent {@value RECENT_WINDOW} broadcasts for the given server.
      * <p>
      * Retries up to {@value MAX_RETRIES} times; throws if all attempts collide.
      * </p>
      *
+     * @param serverId the server ID used to scope the collision check
      * @return a display code unique within the recent window
      * @throws SQLException if the maximum retry count is exceeded or a DB operation fails
      */
-    public String generateUnique() throws SQLException {
+    public String generateUnique(String serverId) throws SQLException {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             String code = generate();
-            if (!broadcastRepository.existsInRecentByDisplayCode(code, RECENT_WINDOW)) {
+            if (!broadcastRepository.existsInRecentByDisplayCode(serverId, code, RECENT_WINDOW)) {
                 return code;
             }
             log.fine("displayCode collision on attempt " + attempt + ", retrying...");

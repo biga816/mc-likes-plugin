@@ -44,18 +44,20 @@ public class BroadcastStatsRepository {
      * initial like is counted as the first reaction.
      *
      * @param conn        the connection in the active transaction
+     * @param serverId    the server ID for scoping the record
      * @param broadcastId the new broadcast's ID
      * @param updatedAt   current timestamp in epoch milliseconds
      * @throws SQLException if a database error occurs
      */
-    public void insertNew(Connection conn, String broadcastId, long updatedAt) throws SQLException {
+    public void insertNew(Connection conn, String serverId, String broadcastId, long updatedAt) throws SQLException {
         String sql = """
-                INSERT INTO like_broadcast_stats (broadcast_id, reaction_count, updated_at)
-                VALUES (?, 1, ?)
+                INSERT INTO like_broadcast_stats (broadcast_id, server_id, reaction_count, updated_at)
+                VALUES (?, ?, 1, ?)
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, broadcastId);
-            ps.setLong(2, updatedAt);
+            ps.setString(2, serverId);
+            ps.setLong(3, updatedAt);
             ps.executeUpdate();
         }
     }
@@ -66,22 +68,24 @@ public class BroadcastStatsRepository {
      * Called when a player reacts to an existing broadcast.
      *
      * @param conn        the connection in the active transaction
+     * @param serverId    the server ID for scoping the record
      * @param broadcastId the broadcast ID to update
      * @param updatedAt   current timestamp in epoch milliseconds
      * @throws SQLException if a database error occurs
      */
-    public void incrementReactionCount(Connection conn, String broadcastId, long updatedAt)
+    public void incrementReactionCount(Connection conn, String serverId, String broadcastId, long updatedAt)
             throws SQLException {
         String sql = """
-                INSERT INTO like_broadcast_stats (broadcast_id, reaction_count, updated_at)
-                VALUES (?, 1, ?)
+                INSERT INTO like_broadcast_stats (broadcast_id, server_id, reaction_count, updated_at)
+                VALUES (?, ?, 1, ?)
                 ON CONFLICT(broadcast_id) DO UPDATE SET
                     reaction_count = reaction_count + 1,
                     updated_at     = excluded.updated_at
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, broadcastId);
-            ps.setLong(2, updatedAt);
+            ps.setString(2, serverId);
+            ps.setLong(3, updatedAt);
             ps.executeUpdate();
         }
     }
@@ -89,26 +93,29 @@ public class BroadcastStatsRepository {
     // ── Read methods (for /like ranking) ─────────────────────────────────────
 
     /**
-     * Returns the top {@code limit} broadcasts by {@code reaction_count}, joined
-     * with their broadcast details for display purposes.
+     * Returns the top {@code limit} broadcasts by {@code reaction_count} for the
+     * given server, joined with their broadcast details for display purposes.
      *
-     * @param limit maximum number of results
+     * @param serverId the server ID to filter by
+     * @param limit    maximum number of results
      * @return list of ranking entries ordered by reaction_count DESC
      * @throws SQLException if a database error occurs
      */
-    public List<BroadcastRankingEntry> getTopBroadcasts(int limit) throws SQLException {
+    public List<BroadcastRankingEntry> getTopBroadcasts(String serverId, int limit) throws SQLException {
         String sql = """
                 SELECT b.broadcast_id, b.display_code, b.created_at,
                        b.source_sender_uuid, b.target_uuid, b.reason_text,
                        s.reaction_count
                 FROM like_broadcast_stats s
                 JOIN likes_broadcasts b ON b.broadcast_id = s.broadcast_id
+                WHERE s.server_id = ?
                 ORDER BY s.reaction_count DESC
                 LIMIT ?
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, limit);
+            ps.setString(1, serverId);
+            ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<BroadcastRankingEntry> results = new ArrayList<>();
                 while (rs.next()) {
@@ -159,15 +166,16 @@ public class BroadcastStatsRepository {
 
     /**
      * Returns the broadcasts received by the given player with the highest
-     * {@code reaction_count} (ties broken by most recent), up to {@code limit}
-     * entries.
+     * {@code reaction_count} (ties broken by most recent), scoped to the given
+     * server, up to {@code limit} entries.
      *
+     * @param serverId   the server ID to filter by
      * @param playerUuid the recipient's UUID
      * @param limit      maximum number of results
      * @return list of ranking entries ordered by reaction_count DESC, created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<BroadcastRankingEntry> getTopLikedBroadcastsReceivedBy(UUID playerUuid, int limit)
+    public List<BroadcastRankingEntry> getTopLikedBroadcastsReceivedBy(String serverId, UUID playerUuid, int limit)
             throws SQLException {
         String sql = """
                 SELECT b.broadcast_id, b.display_code, b.created_at,
@@ -175,14 +183,16 @@ public class BroadcastStatsRepository {
                        s.reaction_count
                 FROM likes_broadcasts b
                 JOIN like_broadcast_stats s ON s.broadcast_id = b.broadcast_id
-                WHERE b.target_uuid = ?
+                WHERE b.server_id = ?
+                  AND b.target_uuid = ?
                 ORDER BY s.reaction_count DESC, b.created_at DESC
                 LIMIT ?
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, playerUuid.toString());
-            ps.setInt(2, limit);
+            ps.setString(1, serverId);
+            ps.setString(2, playerUuid.toString());
+            ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<BroadcastRankingEntry> results = new ArrayList<>();
                 while (rs.next()) {

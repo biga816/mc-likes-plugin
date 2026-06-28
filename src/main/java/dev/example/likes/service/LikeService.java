@@ -55,6 +55,7 @@ public class LikeService {
     private final LikeEffectService effectService;
     private final FileConfiguration config;
     private final Plugin plugin;
+    private final String serverId;
 
     /**
      * Constructs a LikeService with all required dependencies.
@@ -73,7 +74,8 @@ public class LikeService {
             MessageFactory messageFactory,
             LikeEffectService effectService,
             FileConfiguration config,
-            Plugin plugin) {
+            Plugin plugin,
+            String serverId) {
         this.broadcastRepository = broadcastRepository;
         this.eventRepository = eventRepository;
         this.dailyLimitRepository = dailyLimitRepository;
@@ -88,6 +90,7 @@ public class LikeService {
         this.effectService = effectService;
         this.config = config;
         this.plugin = plugin;
+        this.serverId = serverId;
     }
 
     // ── Main operations ──────────────────────────────────────────────────────
@@ -137,7 +140,7 @@ public class LikeService {
         String today = LocalDate.now(ZoneOffset.UTC).toString();
         int dailyLimit = config.getInt("limits.dailyDirectLikeLimit", 20);
         try {
-            int dailyCount = dailyLimitRepository.getDailyCount(today, sender.getUniqueId());
+            int dailyCount = dailyLimitRepository.getDailyCount(serverId, today, sender.getUniqueId());
             if (dailyCount >= dailyLimit) {
                 sender.sendMessage(messageFactory.error("likes.error.daily-limit", Component.text(dailyLimit)));
                 return;
@@ -151,7 +154,7 @@ public class LikeService {
         // ── 5. Generate display code (DB read, main thread) ───────────────────
         String displayCode;
         try {
-            displayCode = displayCodeGenerator.generateUnique();
+            displayCode = displayCodeGenerator.generateUnique(serverId);
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to generate unique displayCode", e);
             sender.sendMessage(messageFactory.error("likes.error.internal"));
@@ -168,20 +171,20 @@ public class LikeService {
         long now = System.currentTimeMillis();
 
         LikesBroadcast broadcast = new LikesBroadcast(
-                broadcastId, displayCode, now, "DIRECT",
+                broadcastId, serverId, displayCode, now, "DIRECT",
                 senderUuid, targetUuid, "CUSTOM", reason);
         LikesEvent senderEvent = new LikesEvent(
-                UUID.randomUUID().toString(), now, broadcastId, senderUuid, targetUuid);
+                UUID.randomUUID().toString(), serverId, now, broadcastId, senderUuid, targetUuid);
 
         // ── 7. Submit atomic write transaction ────────────────────────────────
         writeExecutor.submit(() -> {
             databaseManager.executeInTransaction(conn -> {
                 broadcastRepository.save(broadcast);
                 eventRepository.save(senderEvent);
-                broadcastStatsRepository.insertNew(conn, broadcastId, now);
-                playerStatsRepository.upsertSentCount(conn, senderUuid, senderName, now);
-                playerStatsRepository.upsertReceivedCount(conn, targetUuid, targetName, now);
-                dailyLimitRepository.increment(today, senderUuid);
+                broadcastStatsRepository.insertNew(conn, serverId, broadcastId, now);
+                playerStatsRepository.upsertSentCount(conn, serverId, senderUuid, senderName, now);
+                playerStatsRepository.upsertReceivedCount(conn, serverId, targetUuid, targetName, now);
+                dailyLimitRepository.increment(serverId, today, senderUuid);
             });
             return null;
         }).whenComplete((ignored, ex) ->
@@ -249,7 +252,7 @@ public class LikeService {
     public void react(Player sender, String displayCode) {
         LikesBroadcast broadcast;
         try {
-            var optBroadcast = broadcastRepository.findLatestByDisplayCode(displayCode);
+            var optBroadcast = broadcastRepository.findLatestByDisplayCode(serverId, displayCode);
             if (optBroadcast.isEmpty()) {
                 sender.sendMessage(messageFactory.error("likes.error.not-found",
                         Component.text(displayCode)));
@@ -330,14 +333,14 @@ public class LikeService {
         String eventId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
         LikesEvent event = new LikesEvent(
-                eventId, now, broadcast.broadcastId(), senderUuid, broadcast.targetUuid());
+                eventId, serverId, now, broadcast.broadcastId(), senderUuid, broadcast.targetUuid());
 
         // 4. Submit atomic write transaction
         writeExecutor.submit(() -> {
             databaseManager.executeInTransaction(conn -> {
                 eventRepository.save(event);
-                broadcastStatsRepository.incrementReactionCount(conn, broadcast.broadcastId(), now);
-                playerStatsRepository.upsertReactedCount(conn, senderUuid, senderName, now);
+                broadcastStatsRepository.incrementReactionCount(conn, serverId, broadcast.broadcastId(), now);
+                playerStatsRepository.upsertReactedCount(conn, serverId, senderUuid, senderName, now);
             });
             return null;
         }).whenComplete((ignored, ex) ->

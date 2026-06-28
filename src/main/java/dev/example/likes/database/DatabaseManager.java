@@ -60,6 +60,7 @@ public class DatabaseManager {
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_broadcasts (
                         broadcast_id        TEXT PRIMARY KEY,
+                        server_id           TEXT NOT NULL,
                         display_code        TEXT NOT NULL,
                         created_at          INTEGER NOT NULL,
                         source_type         TEXT NOT NULL,
@@ -73,6 +74,7 @@ public class DatabaseManager {
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_events (
                         event_id     TEXT PRIMARY KEY,
+                        server_id    TEXT NOT NULL,
                         created_at   INTEGER NOT NULL,
                         broadcast_id TEXT NOT NULL,
                         sender_uuid  TEXT NOT NULL,
@@ -84,10 +86,11 @@ public class DatabaseManager {
 
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS likes_sender_daily (
-                        date             TEXT NOT NULL,
-                        sender_uuid      TEXT NOT NULL,
+                        date              TEXT NOT NULL,
+                        server_id         TEXT NOT NULL,
+                        sender_uuid       TEXT NOT NULL,
                         direct_like_count INTEGER NOT NULL,
-                        PRIMARY KEY(date, sender_uuid)
+                        PRIMARY KEY(date, server_id, sender_uuid)
                     )
                     """);
 
@@ -95,18 +98,21 @@ public class DatabaseManager {
 
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS like_player_stats (
-                        player_uuid    TEXT PRIMARY KEY,
+                        server_id      TEXT NOT NULL,
+                        player_uuid    TEXT NOT NULL,
                         player_name    TEXT NOT NULL,
                         received_count INTEGER NOT NULL DEFAULT 0,
                         sent_count     INTEGER NOT NULL DEFAULT 0,
                         reacted_count  INTEGER NOT NULL DEFAULT 0,
-                        updated_at     INTEGER NOT NULL
+                        updated_at     INTEGER NOT NULL,
+                        PRIMARY KEY(server_id, player_uuid)
                     )
                     """);
 
             stmt.execute("""
                     CREATE TABLE IF NOT EXISTS like_broadcast_stats (
                         broadcast_id   TEXT PRIMARY KEY,
+                        server_id      TEXT NOT NULL,
                         reaction_count INTEGER NOT NULL DEFAULT 0,
                         updated_at     INTEGER NOT NULL,
                         FOREIGN KEY(broadcast_id)
@@ -115,48 +121,48 @@ public class DatabaseManager {
                     )
                     """);
 
-            // ── Indexes on existing tables ─────────────────────────────────────
+            // ── Indexes on core tables ─────────────────────────────────────────
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_created_at
-                    ON likes_broadcasts(created_at DESC)
+                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_server_created_at
+                    ON likes_broadcasts(server_id, created_at DESC)
                     """);
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_display_code_created_at
-                    ON likes_broadcasts(display_code, created_at DESC)
+                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_server_display_code_created_at
+                    ON likes_broadcasts(server_id, display_code, created_at DESC)
                     """);
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_likes_events_broadcast_sender
-                    ON likes_events(broadcast_id, sender_uuid)
+                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_server_target
+                    ON likes_broadcasts(server_id, target_uuid, created_at DESC)
                     """);
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_likes_broadcasts_target
-                    ON likes_broadcasts(target_uuid)
+                    CREATE INDEX IF NOT EXISTS idx_likes_events_server_broadcast_sender
+                    ON likes_events(server_id, broadcast_id, sender_uuid)
                     """);
 
             // ── Indexes on aggregation tables ──────────────────────────────────
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_received
-                    ON like_player_stats(received_count DESC)
+                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_server_received
+                    ON like_player_stats(server_id, received_count DESC)
                     """);
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_sent
-                    ON like_player_stats(sent_count DESC)
+                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_server_sent
+                    ON like_player_stats(server_id, sent_count DESC)
                     """);
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_reacted
-                    ON like_player_stats(reacted_count DESC)
+                    CREATE INDEX IF NOT EXISTS idx_like_player_stats_server_reacted
+                    ON like_player_stats(server_id, reacted_count DESC)
                     """);
 
             stmt.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_like_broadcast_stats_reaction
-                    ON like_broadcast_stats(reaction_count DESC)
+                    CREATE INDEX IF NOT EXISTS idx_like_broadcast_stats_server_reaction
+                    ON like_broadcast_stats(server_id, reaction_count DESC)
                     """);
         }
 
