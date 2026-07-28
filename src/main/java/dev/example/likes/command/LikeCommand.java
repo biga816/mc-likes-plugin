@@ -1,9 +1,9 @@
 package dev.example.likes.command;
 
 import dev.example.likes.book.LikeBookService;
-import dev.example.likes.database.BroadcastStatsRepository;
-import dev.example.likes.database.EventRepository;
-import dev.example.likes.model.LikesBroadcast;
+import dev.example.likes.database.ItemStatsRepository;
+import dev.example.likes.database.ReactionRepository;
+import dev.example.likes.model.FeedItem;
 import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
 import dev.example.likes.util.MessageFactory;
@@ -32,8 +32,8 @@ import java.util.logging.Logger;
  *
  * <ul>
  * <li>{@code /like <player> <reason...>} — send a like to a player</li>
- * <li>{@code /like #<displayCode>} — react to a broadcast by display code</li>
- * <li>{@code /like list} — show the 5 most recent likes</li>
+ * <li>{@code /like #<displayCode>} — react to a item by display code</li>
+ * <li>{@code /like log} — show the 5 most recent likes</li>
  * </ul>
  *
  * <p>
@@ -42,7 +42,7 @@ import java.util.logging.Logger;
  * <ol>
  * <li>If the first argument starts with {@code #}, it is treated as a display
  * code.</li>
- * <li>If the first argument is {@code list} (case-insensitive), the list is
+ * <li>If the first argument is {@code log} (case-insensitive), the log is
  * shown.</li>
  * <li>Otherwise, the first argument is treated as a player name.</li>
  * </ol>
@@ -53,19 +53,19 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
 
     private final LikeService likeService;
     private final RecentService recentService;
-    private final BroadcastStatsRepository broadcastStatsRepository;
-    private final EventRepository eventRepository;
+    private final ItemStatsRepository itemStatsRepository;
+    private final ReactionRepository reactionRepository;
     private final MessageFactory messageFactory;
     private final LikeBookService bookService;
 
     public LikeCommand(LikeService likeService, RecentService recentService,
-            BroadcastStatsRepository broadcastStatsRepository,
-            EventRepository eventRepository, MessageFactory messageFactory,
+            ItemStatsRepository itemStatsRepository,
+            ReactionRepository reactionRepository, MessageFactory messageFactory,
             LikeBookService bookService) {
         this.likeService = likeService;
         this.recentService = recentService;
-        this.broadcastStatsRepository = broadcastStatsRepository;
-        this.eventRepository = eventRepository;
+        this.itemStatsRepository = itemStatsRepository;
+        this.reactionRepository = reactionRepository;
         this.messageFactory = messageFactory;
         this.bookService = bookService;
     }
@@ -90,7 +90,7 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // /like log — chat list (replaces /like list)
+        // /like log — recent feed items in chat
         if (first.equalsIgnoreCase("log")) {
             handleLog(player);
             return true;
@@ -137,43 +137,44 @@ public class LikeCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleLog(Player player) {
-        List<LikesBroadcast> recent = recentService.getRecent(5);
+        List<FeedItem> recent = recentService.getRecent(5);
 
         if (recent.isEmpty()) {
             player.sendMessage(messageFactory.info("likes.command.log.empty"));
             return;
         }
 
-        List<String> broadcastIds = recent.stream().map(LikesBroadcast::broadcastId).toList();
+        List<String> itemIds = recent.stream().map(FeedItem::itemId).toList();
         Map<String, Long> countMap = new HashMap<>();
         Set<String> reactedIds = new HashSet<>();
         try {
             // Read reaction_count from the aggregation table to avoid per-call COUNT on
-            // likes_events
-            countMap = broadcastStatsRepository.reactionCountByBroadcastIds(broadcastIds);
-            reactedIds = eventRepository.reactedBroadcastIds(broadcastIds, player.getUniqueId());
+            // reactions
+            countMap = itemStatsRepository.reactionCountByItemIds(itemIds);
+            reactedIds = reactionRepository.reactedItemIds(itemIds, player.getUniqueId());
         } catch (SQLException e) {
-            log.log(Level.WARNING, "Failed to get reaction data for recent broadcasts", e);
+            log.log(Level.WARNING, "Failed to get reaction data for recent items", e);
         }
 
         player.sendMessage(messageFactory.info("likes.command.log.title"));
-        for (LikesBroadcast broadcast : recent) {
-            boolean isOwnSend = broadcast.sourceSenderUuid().equals(player.getUniqueId());
-            Component senderDisplay = isOwnSend
-                    ? Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN)
-                    : Component.text(resolveName(broadcast.sourceSenderUuid())).color(NamedTextColor.WHITE);
-            boolean isOwnLike = broadcast.targetUuid().equals(player.getUniqueId());
+        for (FeedItem item : recent) {
+            boolean isOwnSend = player.getUniqueId().equals(item.initiatorUuid());
+            Component senderDisplay = item.initiatorUuid() == null ? Component.empty()
+                    : isOwnSend
+                            ? Component.translatable("likes.item.you").color(NamedTextColor.GREEN)
+                            : Component.text(resolveName(item.initiatorUuid())).color(NamedTextColor.WHITE);
+            boolean isOwnLike = item.authorUuid().equals(player.getUniqueId());
             Component targetDisplay = isOwnLike
-                    ? Component.translatable("likes.broadcast.you").color(NamedTextColor.GREEN)
-                    : Component.text(resolveName(broadcast.targetUuid())).color(NamedTextColor.WHITE);
-            int count = countMap.getOrDefault(broadcast.broadcastId(), 0L).intValue();
-            boolean alreadyReacted = reactedIds.contains(broadcast.broadcastId());
-            Component msg = messageFactory.buildLogBroadcastMessage(broadcast, senderDisplay, targetDisplay, count,
+                    ? Component.translatable("likes.item.you").color(NamedTextColor.GREEN)
+                    : Component.text(resolveName(item.authorUuid())).color(NamedTextColor.WHITE);
+            int count = countMap.getOrDefault(item.itemId(), 0L).intValue();
+            boolean alreadyReacted = reactedIds.contains(item.itemId());
+            Component msg = messageFactory.buildLogItemMessage(item, senderDisplay, targetDisplay, count,
                     alreadyReacted, !isOwnLike);
             player.sendMessage(msg);
         }
 
-        recentService.updateLastSeen(player.getUniqueId(), recent.get(0).broadcastId());
+        recentService.updateLastSeen(player.getUniqueId(), recent.get(0).itemId());
     }
 
     private String resolveName(java.util.UUID uuid) {

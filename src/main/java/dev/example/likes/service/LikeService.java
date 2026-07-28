@@ -1,25 +1,26 @@
 package dev.example.likes.service;
 
-import dev.example.likes.database.BroadcastRepository;
-import dev.example.likes.database.BroadcastStatsRepository;
+import dev.example.likes.database.FeedItemRepository;
+import dev.example.likes.database.ItemStatsRepository;
 import dev.example.likes.database.DailyLimitRepository;
 import dev.example.likes.database.DatabaseManager;
 import dev.example.likes.database.DatabaseWriteExecutor;
-import dev.example.likes.database.EventRepository;
+import dev.example.likes.database.ReactionRepository;
 import dev.example.likes.database.PlayerStatsRepository;
-import dev.example.likes.model.LikesBroadcast;
-import dev.example.likes.model.LikesEvent;
+import dev.example.likes.model.FeedItem;
+import dev.example.likes.model.Reaction;
+import dev.example.likes.model.PendingChat;
 import dev.example.likes.util.DisplayCodeGenerator;
 import dev.example.likes.util.MessageFactory;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.plugin.Plugin;
 
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -41,16 +42,17 @@ public class LikeService {
 
     private static final Logger log = Logger.getLogger(LikeService.class.getName());
 
-    private final BroadcastRepository broadcastRepository;
-    private final EventRepository eventRepository;
+    private final FeedItemRepository itemRepository;
+    private final ReactionRepository reactionRepository;
     private final DailyLimitRepository dailyLimitRepository;
     private final PlayerStatsRepository playerStatsRepository;
-    private final BroadcastStatsRepository broadcastStatsRepository;
+    private final ItemStatsRepository itemStatsRepository;
     private final DatabaseManager databaseManager;
     private final DatabaseWriteExecutor writeExecutor;
     private final DisplayCodeGenerator displayCodeGenerator;
     private final CooldownService cooldownService;
     private final RecentService recentService;
+    private final PendingChatService pendingChatService;
     private final MessageFactory messageFactory;
     private final LikeEffectService effectService;
     private final FileConfiguration config;
@@ -61,31 +63,33 @@ public class LikeService {
      * Constructs a LikeService with all required dependencies.
      */
     public LikeService(
-            BroadcastRepository broadcastRepository,
-            EventRepository eventRepository,
+            FeedItemRepository itemRepository,
+            ReactionRepository reactionRepository,
             DailyLimitRepository dailyLimitRepository,
             PlayerStatsRepository playerStatsRepository,
-            BroadcastStatsRepository broadcastStatsRepository,
+            ItemStatsRepository itemStatsRepository,
             DatabaseManager databaseManager,
             DatabaseWriteExecutor writeExecutor,
             DisplayCodeGenerator displayCodeGenerator,
             CooldownService cooldownService,
             RecentService recentService,
+            PendingChatService pendingChatService,
             MessageFactory messageFactory,
             LikeEffectService effectService,
             FileConfiguration config,
             Plugin plugin,
             String serverId) {
-        this.broadcastRepository = broadcastRepository;
-        this.eventRepository = eventRepository;
+        this.itemRepository = itemRepository;
+        this.reactionRepository = reactionRepository;
         this.dailyLimitRepository = dailyLimitRepository;
         this.playerStatsRepository = playerStatsRepository;
-        this.broadcastStatsRepository = broadcastStatsRepository;
+        this.itemStatsRepository = itemStatsRepository;
         this.databaseManager = databaseManager;
         this.writeExecutor = writeExecutor;
         this.displayCodeGenerator = displayCodeGenerator;
         this.cooldownService = cooldownService;
         this.recentService = recentService;
+        this.pendingChatService = pendingChatService;
         this.messageFactory = messageFactory;
         this.effectService = effectService;
         this.config = config;
@@ -154,7 +158,7 @@ public class LikeService {
         // ── 5. Generate display code (DB read, main thread) ───────────────────
         String displayCode;
         try {
-            displayCode = displayCodeGenerator.generateUnique(serverId);
+            displayCode = pendingChatService.reserveDisplayCode(displayCodeGenerator, serverId);
         } catch (SQLException e) {
             log.log(Level.SEVERE, "Failed to generate unique displayCode", e);
             sender.sendMessage(messageFactory.error("likes.error.internal"));
@@ -164,32 +168,39 @@ public class LikeService {
         // ── 6. Capture Bukkit values before leaving the main thread ───────────
         UUID senderUuid = sender.getUniqueId();
         String senderName = sender.getName();
-        UUID targetUuid = target.getUniqueId();
+        UUID authorUuid = target.getUniqueId();
         String targetName = target.getName();
+        Location senderLocation = sender.getLocation();
+        String world = senderLocation.getWorld().getName();
+        int x = senderLocation.getBlockX();
+        int y = senderLocation.getBlockY();
+        int z = senderLocation.getBlockZ();
 
-        String broadcastId = UUID.randomUUID().toString();
+        String itemId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
 
-        LikesBroadcast broadcast = new LikesBroadcast(
-                broadcastId, serverId, displayCode, now, "DIRECT",
-                senderUuid, targetUuid, "CUSTOM", reason);
-        LikesEvent senderEvent = new LikesEvent(
-                UUID.randomUUID().toString(), serverId, now, broadcastId, senderUuid, targetUuid);
+        FeedItem item = new FeedItem(
+                itemId, serverId, displayCode, now, "DIRECT",
+                authorUuid, senderUuid, reason, world, x, y, z);
+        Reaction initialReaction = new Reaction(
+                UUID.randomUUID().toString(), serverId, now, itemId, senderUuid, authorUuid, "LIKE");
 
         // ── 7. Submit atomic write transaction ────────────────────────────────
         writeExecutor.submit(() -> {
             databaseManager.executeInTransaction(conn -> {
-                broadcastRepository.save(broadcast);
-                eventRepository.save(senderEvent);
-                broadcastStatsRepository.insertNew(conn, serverId, broadcastId, now);
+                itemRepository.save(item);
+                reactionRepository.save(initialReaction);
+                itemStatsRepository.insertNew(conn, serverId, itemId, now);
                 playerStatsRepository.upsertSentCount(conn, serverId, senderUuid, senderName, now);
-                playerStatsRepository.upsertReceivedCount(conn, serverId, targetUuid, targetName, now);
+                playerStatsRepository.upsertReceivedCount(conn, serverId, authorUuid, targetName, now);
+                playerStatsRepository.upsertReactedCount(conn, serverId, senderUuid, senderName, now);
                 dailyLimitRepository.increment(serverId, today, senderUuid);
             });
             return null;
         }).whenComplete((ignored, ex) ->
         // ── 8. Callback on the main thread ────────────────────────────
         plugin.getServer().getScheduler().runTask(plugin, () -> {
+            pendingChatService.releaseDisplayCode(displayCode);
             if (ex != null) {
                 log.log(Level.SEVERE, "Failed to persist like from " + senderUuid, unwrap(ex));
                 Player senderOnline = Bukkit.getPlayer(senderUuid);
@@ -200,10 +211,10 @@ public class LikeService {
             }
 
             // Set in-memory state now that the DB write succeeded
-            cooldownService.setCooldown(senderUuid, targetUuid);
-            recentService.add(broadcast);
+            cooldownService.setCooldown(senderUuid, authorUuid);
+            recentService.add(item);
             Bukkit.getOnlinePlayers().forEach(
-                    p -> recentService.updateLastSeen(p.getUniqueId(), broadcastId));
+                    p -> recentService.updateLastSeen(p.getUniqueId(), itemId));
 
             // Send success notification to sender (re-resolve in case they logged back in)
             Player senderOnline = Bukkit.getPlayer(senderUuid);
@@ -214,26 +225,26 @@ public class LikeService {
                         Component.text(reason).color(NamedTextColor.GRAY)));
             }
 
-            // Broadcast to all players except sender and target, plus console
+            // Item to all players except sender and target, plus console
             Component senderDisplay = Component.text(senderName).color(NamedTextColor.WHITE);
             Component targetDisplay = Component.text(targetName).color(NamedTextColor.WHITE);
             Audience others = Audience.audience(
                     Stream.concat(
                             Bukkit.getOnlinePlayers().stream()
-                                    .filter(p -> !p.getUniqueId().equals(targetUuid)
+                                    .filter(p -> !p.getUniqueId().equals(authorUuid)
                                             && !p.getUniqueId().equals(senderUuid)),
                             Stream.of(Bukkit.getConsoleSender()))
                             .collect(java.util.stream.Collectors.toList()));
-            others.sendMessage(messageFactory.buildBroadcastMessage(
-                    broadcast, senderDisplay, targetDisplay, -1, false, true, true));
+            others.sendMessage(messageFactory.buildItemMessage(
+                    item, senderDisplay, targetDisplay, -1, false, true, true));
 
             // Send special message to target with "you" label and no react button
-            Player targetOnline = Bukkit.getPlayer(targetUuid);
+            Player targetOnline = Bukkit.getPlayer(authorUuid);
             if (targetOnline != null) {
-                Component youDisplay = Component.translatable("likes.broadcast.you")
+                Component youDisplay = Component.translatable("likes.item.you")
                         .color(NamedTextColor.GREEN);
-                targetOnline.sendMessage(messageFactory.buildBroadcastMessage(
-                        broadcast, senderDisplay, youDisplay));
+                targetOnline.sendMessage(messageFactory.buildItemMessage(
+                        item, senderDisplay, youDisplay));
             }
 
             // Particle effects (success only; exceptions must not fail the like)
@@ -244,82 +255,159 @@ public class LikeService {
     }
 
     /**
-     * Sends a reaction to the broadcast identified by the given displayCode.
+     * Sends a reaction to the item identified by the given displayCode.
      *
      * @param sender      the player sending the reaction
      * @param displayCode the 4-character display code (without {@code #} prefix)
      */
     public void react(Player sender, String displayCode) {
-        LikesBroadcast broadcast;
+        FeedItem item;
         try {
-            var optBroadcast = broadcastRepository.findLatestByDisplayCode(serverId, displayCode);
-            if (optBroadcast.isEmpty()) {
-                sender.sendMessage(messageFactory.error("likes.error.not-found",
-                        Component.text(displayCode)));
+            var optItem = itemRepository.findLatestByDisplayCode(serverId, displayCode);
+            if (optItem.isEmpty()) {
+                reactToPending(sender, displayCode);
                 return;
             }
-            broadcast = optBroadcast.get();
+            item = optItem.get();
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to find broadcast by displayCode: " + displayCode, e);
+            log.log(Level.SEVERE, "Failed to find item by displayCode: " + displayCode, e);
             sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
 
-        reactToBroadcast(sender, broadcast);
+        reactToItem(sender, item);
+    }
+
+    private void reactToPending(Player sender, String displayCode) {
+        var claim = pendingChatService.claim(displayCode);
+        if (claim.isEmpty()) {
+            sender.sendMessage(messageFactory.error("likes.error.chat-expired"));
+            return;
+        }
+
+        PendingChatService.Claim pendingClaim = claim.get();
+        if (!pendingClaim.owner()) {
+            UUID senderUuid = sender.getUniqueId();
+            pendingClaim.completion()
+                    .whenComplete((item, ex) -> plugin.getServer().getScheduler().runTask(plugin, () -> {
+                        Player online = Bukkit.getPlayer(senderUuid);
+                        if (online == null)
+                            return;
+                        if (ex != null)
+                            online.sendMessage(messageFactory.error("likes.error.internal"));
+                        else
+                            reactToItem(online, item);
+                    }));
+            return;
+        }
+
+        reactToPendingChat(sender, pendingClaim.pending());
+    }
+
+    /** Promotes a claimed chat and creates its first reaction atomically. */
+    private void reactToPendingChat(Player reactor, PendingChat pending) {
+        if (reactor.getUniqueId().equals(pending.authorUuid())) {
+            pendingChatService.failPromotion(pending.displayCode(),
+                    new IllegalStateException("Chat author cannot react to own message"));
+            pendingChatService.put(pending);
+            reactor.sendMessage(messageFactory.error("likes.error.self"));
+            return;
+        }
+
+        UUID reactorUuid = reactor.getUniqueId();
+        String reactorName = reactor.getName();
+        String itemId = UUID.randomUUID().toString();
+        long now = System.currentTimeMillis();
+        FeedItem item = new FeedItem(itemId, serverId, pending.displayCode(), pending.createdAt(), "CHAT",
+                pending.authorUuid(), null, pending.bodyText(), pending.world(), pending.x(), pending.y(), pending.z());
+        Reaction reaction = new Reaction(UUID.randomUUID().toString(), serverId, now, itemId,
+                reactorUuid, pending.authorUuid(), "LIKE");
+
+        writeExecutor.submit(() -> {
+            databaseManager.executeInTransaction(conn -> {
+                itemRepository.save(item);
+                reactionRepository.save(reaction);
+                itemStatsRepository.insertNew(conn, serverId, itemId, now);
+                playerStatsRepository.upsertReceivedCount(
+                        conn, serverId, pending.authorUuid(), pending.authorName(), now);
+                playerStatsRepository.upsertReactedCount(conn, serverId, reactorUuid, reactorName, now);
+            });
+            return null;
+        }).whenComplete((ignored, ex) -> plugin.getServer().getScheduler().runTask(plugin, () -> {
+            Player online = Bukkit.getPlayer(reactorUuid);
+            if (ex != null) {
+                pendingChatService.failPromotion(pending.displayCode(), unwrap(ex));
+                pendingChatService.put(pending);
+                log.log(Level.SEVERE, "Failed to promote pending chat #" + pending.displayCode(), unwrap(ex));
+                if (online != null)
+                    online.sendMessage(messageFactory.error("likes.error.internal"));
+                return;
+            }
+
+            recentService.add(item);
+            Bukkit.getOnlinePlayers().forEach(p -> recentService.updateLastSeen(p.getUniqueId(), itemId));
+            pendingChatService.completePromotion(pending.displayCode(), item);
+            if (online != null) {
+                online.sendMessage(messageFactory.success("likes.likeboost.success",
+                        Component.text(pending.authorName()).color(NamedTextColor.WHITE),
+                        Component.text("(#" + pending.displayCode() + ")").color(NamedTextColor.WHITE)));
+                effectService.showReactionEffect(online, Bukkit.getPlayer(pending.authorUuid()));
+            }
+        }));
     }
 
     /**
-     * Sends a reaction to the broadcast the player last saw.
+     * Sends a reaction to the item the player last saw.
      *
      * @param sender the player sending the reaction
      */
     public void react(Player sender) {
-        var optBroadcastId = recentService.getLastSeenBroadcastId(sender.getUniqueId());
-        if (optBroadcastId.isEmpty()) {
+        var optItemId = recentService.getLastSeenItemId(sender.getUniqueId());
+        if (optItemId.isEmpty()) {
             sender.sendMessage(messageFactory.error("likes.error.no-recent"));
             return;
         }
 
-        String broadcastId = optBroadcastId.get();
-        var optBroadcast = recentService.findById(broadcastId);
-        if (optBroadcast.isEmpty()) {
+        String itemId = optItemId.get();
+        var optItem = recentService.findById(itemId);
+        if (optItem.isEmpty()) {
             sender.sendMessage(messageFactory.error("likes.error.no-recent"));
             return;
         }
 
-        reactToBroadcast(sender, optBroadcast.get());
+        reactToItem(sender, optItem.get());
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────
 
     /**
-     * Core reaction logic for a resolved broadcast.
+     * Core reaction logic for a resolved item.
      * <p>
      * Duplicate and self-react checks happen on the main thread. The write
      * transaction is submitted to {@link DatabaseWriteExecutor}; success/failure
      * messages are sent back on the main thread.
      * </p>
      */
-    private void reactToBroadcast(Player sender, LikesBroadcast broadcast) {
+    private void reactToItem(Player sender, FeedItem item) {
         // 1. Disallow self-react
-        if (sender.getUniqueId().equals(broadcast.targetUuid())) {
+        if (sender.getUniqueId().equals(item.authorUuid())) {
             sender.sendMessage(messageFactory.error("likes.error.self"));
             return;
         }
 
-        String displayCode = broadcast.displayCode();
+        String displayCode = item.displayCode();
         Component displayCodeComponent = Component.text("(#" + displayCode + ")")
                 .color(NamedTextColor.WHITE);
 
         // 2. Check for duplicate reaction (DB read, main thread)
         try {
-            if (eventRepository.exists(broadcast.broadcastId(), sender.getUniqueId())) {
+            if (reactionRepository.exists(item.itemId(), sender.getUniqueId())) {
                 sender.sendMessage(messageFactory.error("likes.error.already-reacted", displayCodeComponent));
                 return;
             }
         } catch (SQLException e) {
             log.log(Level.SEVERE,
-                    "Failed to check event existence for broadcastId: " + broadcast.broadcastId(), e);
+                    "Failed to check event existence for itemId: " + item.itemId(), e);
             sender.sendMessage(messageFactory.error("likes.error.internal"));
             return;
         }
@@ -328,19 +416,21 @@ public class LikeService {
         UUID senderUuid = sender.getUniqueId();
         String senderName = sender.getName();
         // Resolve target name on main thread (may call Bukkit API)
-        String targetName = resolvePlayerName(broadcast.targetUuid());
+        String targetName = resolvePlayerName(item.authorUuid());
 
-        String eventId = UUID.randomUUID().toString();
+        String reactionId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LikesEvent event = new LikesEvent(
-                eventId, serverId, now, broadcast.broadcastId(), senderUuid, broadcast.targetUuid());
+        Reaction reaction = new Reaction(
+                reactionId, serverId, now, item.itemId(), senderUuid, item.authorUuid(), "LIKE");
 
         // 4. Submit atomic write transaction
         writeExecutor.submit(() -> {
             databaseManager.executeInTransaction(conn -> {
-                eventRepository.save(event);
-                broadcastStatsRepository.incrementReactionCount(conn, serverId, broadcast.broadcastId(), now);
+                reactionRepository.save(reaction);
+                itemStatsRepository.incrementReactionCount(conn, serverId, item.itemId(), now);
                 playerStatsRepository.upsertReactedCount(conn, serverId, senderUuid, senderName, now);
+                playerStatsRepository.upsertReceivedCount(
+                        conn, serverId, item.authorUuid(), targetName, now);
             });
             return null;
         }).whenComplete((ignored, ex) ->
@@ -349,7 +439,7 @@ public class LikeService {
             Player senderOnline = Bukkit.getPlayer(senderUuid);
             if (ex != null) {
                 Throwable cause = unwrap(ex);
-                if (cause instanceof SQLIntegrityConstraintViolationException) {
+                if (isConstraintViolation(cause)) {
                     // UNIQUE constraint: concurrent duplicate reaction
                     if (senderOnline != null) {
                         senderOnline.sendMessage(messageFactory.error(
@@ -357,8 +447,8 @@ public class LikeService {
                     }
                 } else {
                     log.log(Level.SEVERE,
-                            "Failed to persist reaction on broadcastId: "
-                                    + broadcast.broadcastId(),
+                            "Failed to persist reaction on itemId: "
+                                    + item.itemId(),
                             cause);
                     if (senderOnline != null) {
                         senderOnline.sendMessage(messageFactory.error("likes.error.internal"));
@@ -375,10 +465,10 @@ public class LikeService {
             }
 
             // Update lastSeen
-            recentService.updateLastSeen(senderUuid, broadcast.broadcastId());
+            recentService.updateLastSeen(senderUuid, item.itemId());
 
             // Particle effects (success only; exceptions must not fail the reaction)
-            Player targetOnline = Bukkit.getPlayer(broadcast.targetUuid());
+            Player targetOnline = Bukkit.getPlayer(item.authorUuid());
             if (senderOnline != null) {
                 effectService.showReactionEffect(senderOnline, targetOnline);
             }
@@ -403,5 +493,20 @@ public class LikeService {
             t = t.getCause();
         }
         return t;
+    }
+
+    private static boolean isConstraintViolation(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof SQLException sqlException) {
+                String sqlState = sqlException.getSQLState();
+                if (sqlException.getErrorCode() == 19
+                        || (sqlState != null && sqlState.startsWith("23"))) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

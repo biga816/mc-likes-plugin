@@ -11,8 +11,14 @@ recent:
 reason:
   maxLength: 48
 
-broadcast:
+item:
   prefix: "[LIKE]"
 
 effects:
   enabled: true
+
+chat:
+  enabled: true
+  minLength: 4
+  pendingBufferSize: 30
+  maxStoredLength: 100

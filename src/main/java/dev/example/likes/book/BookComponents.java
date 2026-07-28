@@ -19,11 +19,12 @@ import java.util.UUID;
  */
 class BookComponents {
 
-    private BookComponents() {}
+    private BookComponents() {
+    }
 
     /**
-     * Truncates {@code text} 
-    to at most {@code max} characters,
+     * Truncates {@code text}
+     * to at most {@code max} characters,
      * appending {@code ".."} when truncated.
      */
     static String truncate(String text, int max) {
@@ -39,6 +40,8 @@ class BookComponents {
      * Falls back to the first 8 characters of the UUID string if unknown.
      */
     static String resolveName(UUID uuid) {
+        if (uuid == null)
+            return "";
         Player online = Bukkit.getPlayer(uuid);
         if (online != null)
             return online.getName();
@@ -51,7 +54,7 @@ class BookComponents {
      * {@code viewerUuid}, otherwise {@link NamedTextColor#BLACK}.
      */
     static NamedTextColor nameColor(UUID uuid, UUID viewerUuid) {
-        return uuid.equals(viewerUuid) ? NamedTextColor.GREEN : NamedTextColor.BLACK;
+        return uuid != null && uuid.equals(viewerUuid) ? NamedTextColor.GREEN : NamedTextColor.BLACK;
     }
 
     /**
@@ -62,7 +65,8 @@ class BookComponents {
      * @param count          current reaction count
      * @param alreadyReacted whether the viewer has already reacted
      * @param isViewer       whether the viewer is sender or target
-     * @param tr             locale-bound translator (reserved for future tooltip use)
+     * @param tr             locale-bound translator (reserved for future tooltip
+     *                       use)
      * @return the styled component
      */
     static Component buildClickableHeart(String code, long count, boolean alreadyReacted,
@@ -94,7 +98,6 @@ class BookComponents {
                 .append(Component.text(targetName + " ").color(targetColor));
     }
 
-
     private static final DateTimeFormatter REASON_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /**
@@ -103,8 +106,9 @@ class BookComponents {
      *
      * @param fullText  the full reason text shown on hover
      * @param truncated the truncated text shown inline
-     * @param indent    leading whitespace prefix (e.g. {@code "  "} or {@code "   "})
-     * @param createdAt broadcast creation timestamp in epoch milliseconds
+     * @param indent    leading whitespace prefix (e.g. {@code "  "} or
+     *                  {@code "   "})
+     * @param createdAt item creation timestamp in epoch milliseconds
      * @return the styled component
      */
     static Component buildReasonLine(String fullText, String truncated, String indent, long createdAt) {

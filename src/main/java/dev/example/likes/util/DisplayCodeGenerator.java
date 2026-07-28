@@ -1,9 +1,10 @@
 package dev.example.likes.util;
 
-import dev.example.likes.database.BroadcastRepository;
+import dev.example.likes.database.FeedItemRepository;
 
 import java.security.SecureRandom;
 import java.sql.SQLException;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
@@ -22,15 +23,16 @@ public class DisplayCodeGenerator {
     private static final int RECENT_WINDOW = 100;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final BroadcastRepository broadcastRepository;
+    private final FeedItemRepository itemRepository;
 
     /**
-     * Constructs a DisplayCodeGenerator with uniqueness checking against recent broadcasts.
+     * Constructs a DisplayCodeGenerator with uniqueness checking against recent
+     * items.
      *
-     * @param broadcastRepository the broadcast repository used for collision detection
+     * @param itemRepository the item repository used for collision detection
      */
-    public DisplayCodeGenerator(BroadcastRepository broadcastRepository) {
-        this.broadcastRepository = broadcastRepository;
+    public DisplayCodeGenerator(FeedItemRepository itemRepository) {
+        this.itemRepository = itemRepository;
     }
 
     /**
@@ -48,19 +50,25 @@ public class DisplayCodeGenerator {
 
     /**
      * Generates a 4-character display code that does not collide with any of
-     * the most recent {@value RECENT_WINDOW} broadcasts for the given server.
+     * the most recent {@value RECENT_WINDOW} items for the given server.
      * <p>
      * Retries up to {@value MAX_RETRIES} times; throws if all attempts collide.
      * </p>
      *
      * @param serverId the server ID used to scope the collision check
      * @return a display code unique within the recent window
-     * @throws SQLException if the maximum retry count is exceeded or a DB operation fails
+     * @throws SQLException if the maximum retry count is exceeded or a DB operation
+     *                      fails
      */
     public String generateUnique(String serverId) throws SQLException {
+        return generateUnique(serverId, Set.of());
+    }
+
+    public String generateUnique(String serverId, Set<String> additionalReservedCodes) throws SQLException {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             String code = generate();
-            if (!broadcastRepository.existsInRecentByDisplayCode(serverId, code, RECENT_WINDOW)) {
+            if (!additionalReservedCodes.contains(code)
+                    && !itemRepository.existsInRecentByDisplayCode(serverId, code, RECENT_WINDOW)) {
                 return code;
             }
             log.fine("displayCode collision on attempt " + attempt + ", retrying...");

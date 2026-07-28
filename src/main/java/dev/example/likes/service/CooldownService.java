@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 public class CooldownService {
     private static final Logger log = Logger.getLogger(CooldownService.class.getName());
 
-    /** Key: "senderUuid:targetUuid", Value: cooldown expiry timestamp in ms */
+    /** Key: "senderUuid:authorUuid", Value: cooldown expiry timestamp in ms */
     private final ConcurrentHashMap<String, Long> cooldownMap = new ConcurrentHashMap<>();
     private final int cooldownSeconds;
 

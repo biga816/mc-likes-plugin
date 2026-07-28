@@ -1,6 +1,6 @@
 package dev.example.likes.book;
 
-import dev.example.likes.model.LikesBroadcast;
+import dev.example.likes.model.FeedItem;
 import dev.example.likes.util.PlayerTranslator;
 import dev.example.likes.util.RelativeTimeFormatter;
 import net.kyori.adventure.text.Component;
@@ -43,25 +43,25 @@ public class LikeFeedBookRenderer {
         /**
          * Builds all pages for the feed book.
          *
-         * @param broadcasts        recent broadcasts, newest first
-         * @param reactionCounts    map of broadcastId → reaction count
-         * @param reactedBroadcasts broadcast IDs the viewer has already reacted to
-         * @param viewerUuid        UUID of the player opening the book
-         * @param itemsPerPage      number of entries per book page
-         * @param tr                locale-bound translator for the viewing player
+         * @param items          recent items, newest first
+         * @param reactionCounts map of itemId → reaction count
+         * @param reactedItems   item IDs the viewer has already reacted to
+         * @param viewerUuid     UUID of the player opening the book
+         * @param itemsPerPage   number of entries per book page
+         * @param tr             locale-bound translator for the viewing player
          * @return ordered list of page components
          */
         public List<Component> buildPages(
-                        List<LikesBroadcast> broadcasts,
+                        List<FeedItem> items,
                         Map<String, Long> reactionCounts,
-                        Set<String> reactedBroadcasts,
+                        Set<String> reactedItems,
                         UUID viewerUuid,
                         int itemsPerPage,
                         PlayerTranslator tr) {
 
                 List<Component> pages = new ArrayList<>();
 
-                if (broadcasts.isEmpty()) {
+                if (items.isEmpty()) {
                         TextComponent.Builder b = Component.text();
                         b.append(Component.text(tr.translate("likes.command.feed.title"))
                                         .color(NamedTextColor.BLACK)
@@ -74,9 +74,9 @@ public class LikeFeedBookRenderer {
                         return pages;
                 }
 
-                for (int pageStart = 0; pageStart < broadcasts.size(); pageStart += itemsPerPage) {
-                        int pageEnd = Math.min(pageStart + itemsPerPage, broadcasts.size());
-                        List<LikesBroadcast> pageItems = broadcasts.subList(pageStart, pageEnd);
+                for (int pageStart = 0; pageStart < items.size(); pageStart += itemsPerPage) {
+                        int pageEnd = Math.min(pageStart + itemsPerPage, items.size());
+                        List<FeedItem> pageItems = items.subList(pageStart, pageEnd);
 
                         TextComponent.Builder b = Component.text();
 
@@ -90,20 +90,23 @@ public class LikeFeedBookRenderer {
                         }
 
                         for (int i = 0; i < pageItems.size(); i++) {
-                                LikesBroadcast bc = pageItems.get(i);
+                                FeedItem bc = pageItems.get(i);
 
                                 String timeStr = RelativeTimeFormatter.format(bc.createdAt(), tr);
+                                UUID leadingUuid = bc.initiatorUuid() != null
+                                                ? bc.initiatorUuid()
+                                                : bc.authorUuid();
                                 String senderName = BookComponents.truncate(
-                                                BookComponents.resolveName(bc.sourceSenderUuid()),
+                                                BookComponents.resolveName(leadingUuid),
                                                 MAX_NAME_LEN);
-                                String targetName = BookComponents.truncate(BookComponents.resolveName(bc.targetUuid()),
+                                String targetName = BookComponents.truncate(BookComponents.resolveName(bc.authorUuid()),
                                                 MAX_NAME_LEN);
-                                String reason = BookComponents.truncate(bc.reasonText(), MAX_REASON_LEN);
-                                long count = reactionCounts.getOrDefault(bc.broadcastId(), 0L);
+                                String reason = BookComponents.truncate(bc.bodyText(), MAX_REASON_LEN);
+                                long count = reactionCounts.getOrDefault(bc.itemId(), 0L);
                                 String code = bc.displayCode();
-                                boolean alreadyReacted = reactedBroadcasts.contains(bc.broadcastId());
-                                boolean isViewer = bc.sourceSenderUuid().equals(viewerUuid)
-                                                || bc.targetUuid().equals(viewerUuid);
+                                boolean alreadyReacted = reactedItems.contains(bc.itemId());
+                                boolean isViewer = viewerUuid.equals(bc.initiatorUuid())
+                                                || viewerUuid.equals(bc.authorUuid());
 
                                 // Line 1: relative time
                                 b.append(Component.text("[" + timeStr + "]").color(NamedTextColor.DARK_GRAY)
@@ -112,14 +115,20 @@ public class LikeFeedBookRenderer {
 
                                 // Line 2: sender→target [♡count]
                                 b.append(Component.text("  "));
-                                b.append(BookComponents.buildSenderArrowTarget(
-                                                senderName, BookComponents.nameColor(bc.sourceSenderUuid(), viewerUuid),
-                                                targetName, BookComponents.nameColor(bc.targetUuid(), viewerUuid)));
+                                if ("CHAT".equals(bc.itemType())) {
+                                        b.append(Component.text(senderName + ": ")
+                                                        .color(BookComponents.nameColor(bc.authorUuid(), viewerUuid)));
+                                } else {
+                                        b.append(BookComponents.buildSenderArrowTarget(
+                                                        senderName, BookComponents.nameColor(leadingUuid, viewerUuid),
+                                                        targetName,
+                                                        BookComponents.nameColor(bc.authorUuid(), viewerUuid)));
+                                }
                                 b.append(BookComponents.buildClickableHeart(code, count, alreadyReacted, isViewer, tr));
                                 b.append(Component.newline());
 
                                 // Line 3: reason (truncated inline, full text on hover)
-                                b.append(BookComponents.buildReasonLine(bc.reasonText(), reason, "  ", bc.createdAt()));
+                                b.append(BookComponents.buildReasonLine(bc.bodyText(), reason, "  ", bc.createdAt()));
 
                                 // Blank separator between entries (not after the last one on the page)
                                 if (i < pageItems.size() - 1) {

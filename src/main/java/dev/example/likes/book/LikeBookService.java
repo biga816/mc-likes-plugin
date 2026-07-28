@@ -1,12 +1,12 @@
 package dev.example.likes.book;
 
-import dev.example.likes.database.BroadcastRepository;
-import dev.example.likes.database.BroadcastStatsRepository;
-import dev.example.likes.database.EventRepository;
+import dev.example.likes.database.FeedItemRepository;
+import dev.example.likes.database.ItemStatsRepository;
+import dev.example.likes.database.ReactionRepository;
 import dev.example.likes.database.PlayerStatsRepository;
-import dev.example.likes.model.BroadcastRankingEntry;
-import dev.example.likes.model.LikePlayerStats;
-import dev.example.likes.model.LikesBroadcast;
+import dev.example.likes.model.ItemRankingEntry;
+import dev.example.likes.model.PlayerStats;
+import dev.example.likes.model.FeedItem;
 import dev.example.likes.util.MessageFactory;
 import dev.example.likes.util.PlayerTranslator;
 import net.kyori.adventure.text.Component;
@@ -44,27 +44,27 @@ public class LikeBookService {
     private static final int RANKING_LIMIT = 10;
 
     /**
-     * Number of broadcasts fetched for the Popular Likes page.
+     * Number of items fetched for the Popular Likes page.
      * The renderer caps the display at 5 due to the 2-line-per-entry format.
      */
     private static final int POPULAR_LIMIT = 10;
 
-    /** Number of broadcasts shown on each mine received/sent page. */
+    /** Number of items shown on each mine received/sent page. */
     private static final int MINE_LIMIT = 6;
 
-    /** Number of most-liked received broadcasts shown on the mine summary page. */
+    /** Number of most-liked received items shown on the mine summary page. */
     private static final int MOST_LIKED_LIMIT = 3;
 
-    /** Maximum number of broadcasts loaded for the feed. */
+    /** Maximum number of items loaded for the feed. */
     private static final int FEED_MAX_ITEMS = 40;
 
     /** Number of feed entries shown per book page. */
     private static final int FEED_ITEMS_PER_PAGE = 4;
 
     private final PlayerStatsRepository playerStatsRepo;
-    private final BroadcastStatsRepository broadcastStatsRepo;
-    private final BroadcastRepository broadcastRepo;
-    private final EventRepository eventRepo;
+    private final ItemStatsRepository itemStatsRepo;
+    private final FeedItemRepository itemRepo;
+    private final ReactionRepository reactionRepo;
     private final MessageFactory messageFactory;
     private final JavaPlugin plugin;
     private final String serverId;
@@ -75,26 +75,26 @@ public class LikeBookService {
     /**
      * Constructs the service with all required dependencies.
      *
-     * @param playerStatsRepo    repository for per-player aggregation data
-     * @param broadcastStatsRepo repository for per-broadcast aggregation data
-     * @param broadcastRepo      repository for raw broadcast records
-     * @param eventRepo          repository for like events (reaction lookups)
-     * @param messageFactory     factory used to obtain per-player translators
-     * @param plugin             the plugin instance (for scheduler access)
-     * @param serverId           the server ID used to scope all queries
+     * @param playerStatsRepo repository for per-player aggregation data
+     * @param itemStatsRepo   repository for per-item aggregation data
+     * @param itemRepo        repository for raw item records
+     * @param reactionRepo    repository for like events (reaction lookups)
+     * @param messageFactory  factory used to obtain per-player translators
+     * @param plugin          the plugin instance (for scheduler access)
+     * @param serverId        the server ID used to scope all queries
      */
     public LikeBookService(
             PlayerStatsRepository playerStatsRepo,
-            BroadcastStatsRepository broadcastStatsRepo,
-            BroadcastRepository broadcastRepo,
-            EventRepository eventRepo,
+            ItemStatsRepository itemStatsRepo,
+            FeedItemRepository itemRepo,
+            ReactionRepository reactionRepo,
             MessageFactory messageFactory,
             JavaPlugin plugin,
             String serverId) {
         this.playerStatsRepo = playerStatsRepo;
-        this.broadcastStatsRepo = broadcastStatsRepo;
-        this.broadcastRepo = broadcastRepo;
-        this.eventRepo = eventRepo;
+        this.itemStatsRepo = itemStatsRepo;
+        this.itemRepo = itemRepo;
+        this.reactionRepo = reactionRepo;
         this.messageFactory = messageFactory;
         this.plugin = plugin;
         this.serverId = serverId;
@@ -113,13 +113,13 @@ public class LikeBookService {
         PlayerTranslator tr = messageFactory.translatorFor(player);
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                List<LikePlayerStats> received = playerStatsRepo.getTopReceivedPlayers(serverId, RANKING_LIMIT);
-                List<LikePlayerStats> sent = playerStatsRepo.getTopSentPlayers(serverId, RANKING_LIMIT);
-                List<BroadcastRankingEntry> popular = broadcastStatsRepo.getTopBroadcasts(serverId, POPULAR_LIMIT);
+                List<PlayerStats> received = playerStatsRepo.getTopReceivedPlayers(serverId, RANKING_LIMIT);
+                List<PlayerStats> sent = playerStatsRepo.getTopSentPlayers(serverId, RANKING_LIMIT);
+                List<ItemRankingEntry> popular = itemStatsRepo.getTopItems(serverId, POPULAR_LIMIT);
                 List<String> popularIds = popular.stream()
-                        .map(BroadcastRankingEntry::broadcastId)
+                        .map(ItemRankingEntry::itemId)
                         .toList();
-                Set<String> reacted = eventRepo.reactedBroadcastIds(popularIds, player.getUniqueId());
+                Set<String> reacted = reactionRepo.reactedItemIds(popularIds, player.getUniqueId());
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     List<Component> pages = rankingRenderer.buildPages(
@@ -145,22 +145,22 @@ public class LikeBookService {
         PlayerTranslator tr = messageFactory.translatorFor(player);
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                Optional<LikePlayerStats> statsOpt = playerStatsRepo.getPlayerStats(serverId, player.getUniqueId());
-                List<BroadcastRankingEntry> mostLiked = broadcastStatsRepo
-                        .getTopLikedBroadcastsReceivedBy(serverId, player.getUniqueId(), MOST_LIKED_LIMIT);
-                List<LikesBroadcast> received = broadcastRepo.getRecentBroadcastsReceivedBy(
+                Optional<PlayerStats> statsOpt = playerStatsRepo.getPlayerStats(serverId, player.getUniqueId());
+                List<ItemRankingEntry> mostLiked = itemStatsRepo
+                        .getTopLikedItemsReceivedBy(serverId, player.getUniqueId(), MOST_LIKED_LIMIT);
+                List<FeedItem> received = itemRepo.getRecentItemsReceivedBy(
                         serverId, player.getUniqueId(), MINE_LIMIT);
-                List<LikesBroadcast> sent = broadcastRepo.getRecentBroadcastsSentBy(
+                List<FeedItem> sent = itemRepo.getRecentItemsInitiatedBy(
                         serverId, player.getUniqueId(), MINE_LIMIT);
 
                 List<String> allIds = new ArrayList<>();
-                received.stream().map(LikesBroadcast::broadcastId).forEach(allIds::add);
-                sent.stream().map(LikesBroadcast::broadcastId).forEach(allIds::add);
+                received.stream().map(FeedItem::itemId).forEach(allIds::add);
+                sent.stream().map(FeedItem::itemId).forEach(allIds::add);
                 Map<String, Long> reactionCounts = allIds.isEmpty()
                         ? Map.of()
-                        : broadcastStatsRepo.reactionCountByBroadcastIds(allIds);
+                        : itemStatsRepo.reactionCountByItemIds(allIds);
 
-                LikePlayerStats stats = statsOpt.orElse(null);
+                PlayerStats stats = statsOpt.orElse(null);
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     List<Component> pages = mineRenderer.buildPages(stats, mostLiked, received, sent, reactionCounts,
@@ -177,7 +177,7 @@ public class LikeBookService {
     }
 
     /**
-     * Fetches the most recent like broadcasts asynchronously and opens a
+     * Fetches the most recent like items asynchronously and opens a
      * multi-page feed book on the main thread when done.
      *
      * @param player the player to open the book for
@@ -186,20 +186,20 @@ public class LikeBookService {
         PlayerTranslator tr = messageFactory.translatorFor(player);
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                List<LikesBroadcast> broadcasts = broadcastRepo.findRecent(serverId, FEED_MAX_ITEMS);
-                List<String> ids = broadcasts.stream()
-                        .map(LikesBroadcast::broadcastId)
+                List<FeedItem> items = itemRepo.findRecent(serverId, FEED_MAX_ITEMS);
+                List<String> ids = items.stream()
+                        .map(FeedItem::itemId)
                         .toList();
                 Map<String, Long> reactionCounts = ids.isEmpty()
                         ? Map.of()
-                        : broadcastStatsRepo.reactionCountByBroadcastIds(ids);
+                        : itemStatsRepo.reactionCountByItemIds(ids);
                 Set<String> reacted = ids.isEmpty()
                         ? Set.of()
-                        : eventRepo.reactedBroadcastIds(ids, player.getUniqueId());
+                        : reactionRepo.reactedItemIds(ids, player.getUniqueId());
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     List<Component> pages = feedRenderer.buildPages(
-                            broadcasts, reactionCounts, reacted,
+                            items, reactionCounts, reacted,
                             player.getUniqueId(), FEED_ITEMS_PER_PAGE, tr);
                     openBook(player, tr.translate("likes.command.feed.title"), pages);
                 });

@@ -1,6 +1,6 @@
 package dev.example.likes.util;
 
-import dev.example.likes.model.LikesBroadcast;
+import dev.example.likes.model.FeedItem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -32,22 +32,22 @@ public class MessageFactory {
      * Constructs a MessageFactory.
      *
      * @param config plugin configuration; reads the prefix from
-     *               {@code broadcast.prefix}.
+     *               {@code item.prefix}.
      *               Defaults to {@code "[LIKE]"} if the key is absent.
      */
     public MessageFactory(FileConfiguration config) {
-        this.prefix = config.getString("broadcast.prefix", "[LIKE]");
+        this.prefix = config.getString("item.prefix", "[LIKE]");
     }
 
     /**
-     * Builds a broadcast message for {@code /like log} with an absolute datetime
+     * Builds a item message for {@code /like log} with an absolute datetime
      * label inserted between the prefix and the sender name.
      * <p>
      * Format:
-     * {@code [LIKE][yyyy-MM-dd HH:mm] sender -♥→ target "reason"  [♡n]  (#code)}
+     * {@code [LIKE][yyyy-MM-dd HH:mm] sender → target: "reason"  [♡n]  (#code)}
      * </p>
      *
-     * @param broadcast      the broadcast data
+     * @param item           the item data
      * @param senderDisplay  pre-built component for the sender name slot
      * @param targetDisplay  pre-built component for the target name slot
      * @param reactionCount  total number of reactions, or {@code -1} to show no
@@ -56,43 +56,39 @@ public class MessageFactory {
      * @param clickable      whether the react button should have a click event
      * @return the assembled {@link Component}
      */
-    public Component buildLogBroadcastMessage(LikesBroadcast broadcast,
+    public Component buildLogItemMessage(FeedItem item,
             Component senderDisplay, Component targetDisplay,
             int reactionCount, boolean alreadyReacted, boolean clickable) {
         String dateLabel = "[" + LOG_DATE_FORMAT.format(
-                Instant.ofEpochMilli(broadcast.createdAt())
+                Instant.ofEpochMilli(item.createdAt())
                         .atZone(ZoneId.systemDefault()))
                 + "]";
 
-        Component message = Component.text(dateLabel + " ")
-                .color(NamedTextColor.AQUA)
-                .append(senderDisplay)
-                .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
-                .append(targetDisplay)
-                .append(Component.text("  \"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
+        Component message = Component.text(dateLabel + " ").color(NamedTextColor.AQUA)
+                .append(buildItemBody(item, senderDisplay, targetDisplay));
 
-        return message.append(buildReactSuffix(broadcast.displayCode(), reactionCount, alreadyReacted, clickable));
+        return message.append(buildReactSuffix(item.displayCode(), reactionCount, alreadyReacted, clickable));
     }
 
     /**
-     * Builds the simplest broadcast message: no reaction count, no react button.
+     * Builds the simplest item message: no reaction count, no react button.
      * <p>
      * Use
-     * {@link #buildBroadcastMessage(LikesBroadcast, Component, Component, int, boolean, boolean, boolean)}
+     * {@link #buildItemMessage(FeedItem, Component, Component, int, boolean, boolean, boolean)}
      * for full control over reaction count and button behavior.
      * </p>
      *
-     * @param broadcast     the broadcast data
+     * @param item          the item data
      * @param senderDisplay pre-built component for the sender name slot
      * @param targetDisplay pre-built component for the target name slot
      * @return the assembled {@link Component}
      */
-    public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay) {
-        return buildBroadcastMessage(broadcast, senderDisplay, targetDisplay, -1, false, false, false);
+    public Component buildItemMessage(FeedItem item, Component senderDisplay, Component targetDisplay) {
+        return buildItemMessage(item, senderDisplay, targetDisplay, -1, false, false, false);
     }
 
     /**
-     * Builds a server-wide broadcast message with full control over sender/target
+     * Builds a server-wide item message with full control over sender/target
      * display components, react button visibility, and click interactivity.
      * <p>
      * When {@code clickable} is {@code false} and the player has not yet reacted,
@@ -100,7 +96,7 @@ public class MessageFactory {
      * (used when the viewing player is the like target and cannot react).
      * </p>
      *
-     * @param broadcast       the broadcast data
+     * @param item            the item data
      * @param senderDisplay   pre-built component for the sender name slot
      * @param targetDisplay   pre-built component for the target name slot
      * @param reactionCount   total number of reactions, or {@code -1} to show no
@@ -111,23 +107,37 @@ public class MessageFactory {
      *                        underline decoration
      * @return the assembled {@link Component}
      */
-    public Component buildBroadcastMessage(LikesBroadcast broadcast, Component senderDisplay, Component targetDisplay,
+    public Component buildItemMessage(FeedItem item, Component senderDisplay, Component targetDisplay,
             int reactionCount, boolean alreadyReacted, boolean showReactButton, boolean clickable) {
-        String displayCode = broadcast.displayCode();
+        String displayCode = item.displayCode();
 
         Component message = Component.text(prefix)
                 .color(NamedTextColor.AQUA)
                 .append(Component.text(" "))
-                .append(senderDisplay)
-                .append(Component.text(" -♥→ ").color(NamedTextColor.RED))
-                .append(targetDisplay)
-                .append(Component.text("  \"" + broadcast.reasonText() + "\"").color(NamedTextColor.GRAY));
+                .append(buildItemBody(item, senderDisplay, targetDisplay));
 
         if (!showReactButton) {
             return message;
         }
 
         return message.append(buildReactSuffix(displayCode, reactionCount, alreadyReacted, clickable));
+    }
+
+    private Component buildItemBody(FeedItem item, Component senderDisplay, Component authorDisplay) {
+        if ("CHAT".equals(item.itemType())) {
+            return Component.translatable("likes.feed.chat.format",
+                    authorDisplay,
+                    Component.text(item.bodyText()).color(NamedTextColor.GRAY));
+        }
+
+        return Component.translatable("likes.feed.chat.format",
+                senderDisplay.append(Component.text(" → ").color(NamedTextColor.RED))
+                        .append(authorDisplay),
+                Component.text(item.bodyText()).color(NamedTextColor.GRAY));
+    }
+
+    public Component buildChatLikeSuffix(String displayCode) {
+        return buildReactSuffix(displayCode, -1, false, true);
     }
 
     private Component buildReactSuffix(String displayCode, int reactionCount, boolean alreadyReacted,
@@ -145,7 +155,7 @@ public class MessageFactory {
                     .decorate(TextDecoration.UNDERLINED)
                     .clickEvent(ClickEvent.runCommand("/like #" + displayCode))
                     .hoverEvent(HoverEvent.showText(
-                            Component.translatable("likes.broadcast.react.hover")
+                            Component.translatable("likes.item.react.hover")
                                     .append(Component.text("\n#"))
                                     .append(Component.text(displayCode).color(NamedTextColor.WHITE))));
             codeLabel = codeLabel.color(NamedTextColor.WHITE);

@@ -1,6 +1,6 @@
 # Likes
 
-A Minecraft Paper plugin that encourages positive interactions by allowing players to send "Likes" to each other and react to existing Likes.
+A Minecraft Paper plugin that encourages positive interactions by allowing players to send direct Likes, like ordinary chat messages, and react to items in a unified feed.
 
 Likes provides a lightweight social system with feeds, rankings, personal statistics, and multilingual support, helping communities recognize and celebrate positive moments.
 
@@ -9,12 +9,14 @@ Likes provides a lightweight social system with feeds, rankings, personal statis
 # Features
 
 * ❤️ Send Likes to other players with a custom message
-* ❤️ React to existing Likes via display code (e.g. `/like #ABCD`)
-* 📖 Browse the recent Like feed (in-game book UI, up to 40 entries)
-* 🏆 View player rankings: top receivers, top givers, and most-reacted Likes (book UI)
+* 💬 Like ordinary chat messages using a per-viewer clickable `[♡]` control
+* ⬆️ Promote a chat message to the feed only when it receives its first Like; unliked messages are not persisted
+* ❤️ React to feed items via display code (e.g. `/like #ABCD`), including clients that cannot click chat controls
+* 📖 Browse the unified DIRECT/CHAT feed (in-game book UI, up to 40 entries)
+* 🏆 View player rankings: top receivers, top direct givers, and most-reacted feed items (book UI)
 * 👤 View your personal Like statistics with received, sent, and reacted counts (book UI)
-* 💬 Quick chat log of the 5 most recent Likes (`/like log`)
-* 🔔 Server-wide broadcast on Like and reaction with a clickable react button
+* 🧾 Quick chat log of the 5 most recent feed items (`/like log`)
+* 🔔 Server-wide announcement for direct Likes with a clickable reaction control
 * ✨ Particle effects (heart + firework) on Like and reaction success
 * 🛡️ Daily Like limit and per-pair cooldown to prevent spam
 * 🌐 Multi-language support — locale auto-detected from each player's client (English and Japanese)
@@ -31,11 +33,11 @@ All commands require the `likes.use` permission (granted to all players by defau
 | Command                        | Description                                    |
 | ------------------------------ | ---------------------------------------------- |
 | `/like <player> <reason...>`   | Send a Like to another player                  |
-| `/like #<code>`                | React to an existing Like by display code      |
-| `/like feed`                   | Open the recent Like feed (book UI)            |
+| `/like #<code>`                | Like a pending chat or react to a feed item    |
+| `/like feed`                   | Open the recent unified feed (book UI)         |
 | `/like ranking`                | Open the ranking screen (book UI)              |
 | `/like mine`                   | View your personal Like statistics (book UI)   |
-| `/like log`                    | Show the 5 most recent Likes in chat           |
+| `/like log`                    | Show the 5 most recent feed items in chat      |
 
 ## Permissions
 
@@ -83,10 +85,32 @@ The plugin generates `plugins/Likes/config.yml` automatically on first run with 
 | `limits.pairCooldownSeconds` | `60`      | Cooldown in seconds before the same player can Like the same target again. Resets on server restart.                            |
 | `recent.bufferSize`          | `100`     | Size of the in-memory recent Like buffer loaded from the database on startup.                                                   |
 | `reason.maxLength`           | `48`      | Maximum character length of the Like reason text.                                                                               |
-| `broadcast.prefix`           | `[LIKE]`  | Prefix shown at the start of server-wide Like broadcast messages in chat.                                                       |
+| `item.prefix`                | `[LIKE]`  | Prefix shown at the start of direct Like announcements in chat.                                                                 |
 | `effects.enabled`            | `true`    | Enable or disable particle effects (heart + firework) on Like and reaction success.                                             |
+| `chat.enabled`               | `true`    | Enable or disable chat Likes. When disabled, the plugin does not modify `AsyncChatEvent` renderers.                              |
+| `chat.minLength`             | `4`       | Minimum plain-text message length eligible for a chat Like control. Whitespace-only and shorter messages are ignored.            |
+| `chat.pendingBufferSize`     | `30`      | Number of unpromoted chat messages retained in memory. Old entries are discarded and their display codes become reusable.        |
+| `chat.maxStoredLength`       | `100`     | Maximum plain-text length persisted when a chat message is promoted. Truncated messages end with `…`.                           |
 
 **Language** is not a config option. The plugin automatically uses each player's Minecraft client locale. Supported locales: English (`en_US`) and Japanese (`ja_JP`). English is the fallback for all other locales.
+
+## Chat Likes
+
+When chat Likes are enabled, eligible public chat messages receive a clickable `[♡]` control for every viewer except the author. The control runs `/like #<code>`, so the same code can be entered manually by Bedrock/Geyser players or other clients that cannot use chat click events.
+
+The plugin wraps the `ChatRenderer` already installed on `AsyncChatEvent`; it does not rebuild the existing format. Prefixes, nicknames, chat colors, channel decorations, and other component events supplied by preceding chat plugins are therefore preserved. The listener runs at `HIGHEST` priority and ignores cancelled chat events.
+
+Paper does not expose a universal way to distinguish global chat from staff, party, guild, or local channels. Chat Likes are intended for public normal chat. If another plugin routes chat through private channels or replaces the renderer later in the event pipeline, verify compatibility on your server and disable `chat.enabled` if necessary.
+
+Pending chat messages exist only in memory. The first reaction atomically creates a `CHAT` feed item and its initial reaction in SQLite. Messages evicted from the pending buffer without a reaction are never stored.
+
+## Statistics
+
+The unified feed uses these count definitions:
+
+* **Received** — all reactions on feed items authored by the player, across DIRECT and CHAT items.
+* **Sent** — DIRECT feed items initiated by the player.
+* **Reacted** — reactions made by the player, including the initial reaction created with a DIRECT item.
 
 ---
 

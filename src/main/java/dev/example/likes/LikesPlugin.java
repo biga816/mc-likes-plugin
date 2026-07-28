@@ -2,17 +2,20 @@ package dev.example.likes;
 
 import dev.example.likes.book.LikeBookService;
 import dev.example.likes.command.LikeCommand;
-import dev.example.likes.database.BroadcastRepository;
-import dev.example.likes.database.BroadcastStatsRepository;
+import dev.example.likes.listener.ChatLikeListener;
+import dev.example.likes.database.FeedItemRepository;
+import dev.example.likes.database.ItemStatsRepository;
 import dev.example.likes.database.DailyLimitRepository;
 import dev.example.likes.database.DatabaseManager;
 import dev.example.likes.database.DatabaseWriteExecutor;
-import dev.example.likes.database.EventRepository;
+import dev.example.likes.database.ReactionRepository;
 import dev.example.likes.database.PlayerStatsRepository;
 import dev.example.likes.service.CooldownService;
+import dev.example.likes.service.ChatLikeEligibilityService;
 import dev.example.likes.service.LikeEffectService;
 import dev.example.likes.service.LikeService;
 import dev.example.likes.service.RecentService;
+import dev.example.likes.service.PendingChatService;
 import dev.example.likes.util.I18nService;
 import dev.example.likes.util.MessageFactory;
 import dev.example.likes.util.DisplayCodeGenerator;
@@ -66,43 +69,53 @@ public class LikesPlugin extends JavaPlugin {
         writeExecutor = new DatabaseWriteExecutor();
 
         // 5. Initialize repositories
-        BroadcastRepository broadcastRepo = new BroadcastRepository(databaseManager);
-        EventRepository eventRepo = new EventRepository(databaseManager);
+        FeedItemRepository itemRepo = new FeedItemRepository(databaseManager);
+        ReactionRepository reactionRepo = new ReactionRepository(databaseManager);
         DailyLimitRepository dailyRepo = new DailyLimitRepository(databaseManager);
         PlayerStatsRepository playerStatsRepo = new PlayerStatsRepository(databaseManager);
-        BroadcastStatsRepository broadcastStatsRepo = new BroadcastStatsRepository(databaseManager);
+        ItemStatsRepository itemStatsRepo = new ItemStatsRepository(databaseManager);
 
         // 6. Initialize services
         CooldownService cooldownService = new CooldownService(getConfig());
         RecentService recentService = new RecentService(getConfig());
         try {
-            recentService.loadFromDb(broadcastRepo, serverId);
+            recentService.loadFromDb(itemRepo, serverId);
         } catch (SQLException e) {
-            getLogger().log(Level.SEVERE, "Failed to load recent broadcasts on startup", e);
+            getLogger().log(Level.SEVERE, "Failed to load recent items on startup", e);
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
-        DisplayCodeGenerator displayCodeGen = new DisplayCodeGenerator(broadcastRepo);
+        DisplayCodeGenerator displayCodeGen = new DisplayCodeGenerator(itemRepo);
         MessageFactory messageFactory = new MessageFactory(getConfig());
         LikeEffectService effectService = new LikeEffectService(getConfig());
+        PendingChatService pendingChatService = new PendingChatService(
+                getConfig().getInt("chat.pendingBufferSize", 30));
 
         LikeService likeService = new LikeService(
-                broadcastRepo, eventRepo, dailyRepo,
-                playerStatsRepo, broadcastStatsRepo,
+                itemRepo, reactionRepo, dailyRepo,
+                playerStatsRepo, itemStatsRepo,
                 databaseManager, writeExecutor,
-                displayCodeGen, cooldownService, recentService, messageFactory,
+                displayCodeGen, cooldownService, recentService, pendingChatService, messageFactory,
                 effectService, getConfig(), this, serverId);
 
         // 7. Book UI service
         LikeBookService bookService = new LikeBookService(
-                playerStatsRepo, broadcastStatsRepo, broadcastRepo, eventRepo, messageFactory, this, serverId);
+                playerStatsRepo, itemStatsRepo, itemRepo, reactionRepo, messageFactory, this, serverId);
 
         // 8. Register commands
         LikeCommand likeCommand = new LikeCommand(likeService, recentService,
-                broadcastStatsRepo, eventRepo, messageFactory, bookService);
+                itemStatsRepo, reactionRepo, messageFactory, bookService);
         getCommand("like").setExecutor(likeCommand);
         getCommand("like").setTabCompleter(likeCommand);
+
+        if (getConfig().getBoolean("chat.enabled", false)) {
+            ChatLikeEligibilityService eligibility = new ChatLikeEligibilityService(
+                    true, getConfig().getInt("chat.minLength", 4));
+            getServer().getPluginManager().registerEvents(new ChatLikeListener(
+                    pendingChatService, displayCodeGen, messageFactory, eligibility, serverId,
+                    getConfig().getInt("chat.maxStoredLength", 100)), this);
+        }
 
         getLogger().info("Likes enabled!");
     }

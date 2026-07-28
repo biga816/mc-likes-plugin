@@ -1,6 +1,6 @@
 package dev.example.likes.database;
 
-import dev.example.likes.model.LikesEvent;
+import dev.example.likes.model.Reaction;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -14,59 +14,60 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Repository for accessing the likes_events table.
+ * Repository for accessing the reactions table.
  */
-public class EventRepository {
+public class ReactionRepository {
 
     private final DatabaseManager databaseManager;
 
     /**
-     * Constructs an EventRepository.
+     * Constructs an ReactionRepository.
      *
      * @param databaseManager the database connection manager
      */
-    public EventRepository(DatabaseManager databaseManager) {
+    public ReactionRepository(DatabaseManager databaseManager) {
         this.databaseManager = databaseManager;
     }
 
     /**
      * Saves a like event to the database.
      *
-     * @param event the event to save
+     * @param reaction the reaction to save
      * @throws SQLException if a database operation fails
      */
-    public void save(LikesEvent event) throws SQLException {
+    public void save(Reaction reaction) throws SQLException {
         String sql = """
-                INSERT INTO likes_events
-                    (event_id, server_id, created_at, broadcast_id, sender_uuid, target_uuid)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO reactions
+                    (reaction_id, server_id, created_at, item_id, reactor_uuid, author_uuid, reaction_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, event.eventId());
-            ps.setString(2, event.serverId());
-            ps.setLong(3, event.createdAt());
-            ps.setString(4, event.broadcastId());
-            ps.setString(5, event.senderUuid().toString());
-            ps.setString(6, event.targetUuid().toString());
+            ps.setString(1, reaction.reactionId());
+            ps.setString(2, reaction.serverId());
+            ps.setLong(3, reaction.createdAt());
+            ps.setString(4, reaction.itemId());
+            ps.setString(5, reaction.reactorUuid().toString());
+            ps.setString(6, reaction.authorUuid().toString());
+            ps.setString(7, reaction.reactionType());
             ps.executeUpdate();
         }
     }
 
     /**
-     * Checks whether an event exists for the given broadcast ID and sender UUID.
-     * Used to prevent duplicate likes on the same broadcast.
+     * Checks whether an event exists for the given item ID and sender UUID.
+     * Used to prevent duplicate likes on the same item.
      *
-     * @param broadcastId the broadcast ID to check
-     * @param senderUuid  the sender's UUID to check
+     * @param itemId     the item ID to check
+     * @param senderUuid the sender's UUID to check
      * @return true if such an event already exists
      * @throws SQLException if a database operation fails
      */
-    public boolean exists(String broadcastId, UUID senderUuid) throws SQLException {
-        String sql = "SELECT 1 FROM likes_events WHERE broadcast_id = ? AND sender_uuid = ? LIMIT 1";
+    public boolean exists(String itemId, UUID senderUuid) throws SQLException {
+        String sql = "SELECT 1 FROM reactions WHERE item_id = ? AND reactor_uuid = ? LIMIT 1";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, broadcastId);
+            ps.setString(1, itemId);
             ps.setString(2, senderUuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -75,7 +76,7 @@ public class EventRepository {
     }
 
     /**
-     * Returns recent broadcasts that the given player has reacted to, scoped to
+     * Returns recent items that the given player has reacted to, scoped to
      * the given server, ordered by event creation time descending.
      *
      * @param serverId   the server ID to filter by
@@ -84,12 +85,12 @@ public class EventRepository {
      * @return list of event records ordered by created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<LikesEvent> getRecentReactionsBy(String serverId, UUID senderUuid, int limit)
+    public List<Reaction> getRecentReactionsBy(String serverId, UUID senderUuid, int limit)
             throws SQLException {
         String sql = """
-                SELECT * FROM likes_events
+                SELECT * FROM reactions
                 WHERE server_id = ?
-                  AND sender_uuid = ?
+                  AND reactor_uuid = ?
                 ORDER BY created_at DESC
                 LIMIT ?
                 """;
@@ -99,15 +100,16 @@ public class EventRepository {
             ps.setString(2, senderUuid.toString());
             ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                List<LikesEvent> results = new ArrayList<>();
+                List<Reaction> results = new ArrayList<>();
                 while (rs.next()) {
-                    results.add(new LikesEvent(
-                            rs.getString("event_id"),
+                    results.add(new Reaction(
+                            rs.getString("reaction_id"),
                             rs.getString("server_id"),
                             rs.getLong("created_at"),
-                            rs.getString("broadcast_id"),
-                            UUID.fromString(rs.getString("sender_uuid")),
-                            UUID.fromString(rs.getString("target_uuid"))));
+                            rs.getString("item_id"),
+                            UUID.fromString(rs.getString("reactor_uuid")),
+                            UUID.fromString(rs.getString("author_uuid")),
+                            rs.getString("reaction_type")));
                 }
                 return results;
             }
@@ -115,26 +117,26 @@ public class EventRepository {
     }
 
     /**
-     * Returns the set of broadcast IDs (from the given list) that the specified
+     * Returns the set of item IDs (from the given list) that the specified
      * sender has already reacted to.
      *
-     * @param broadcastIds the list of broadcast IDs to check
-     * @param senderUuid   the sender's UUID
-     * @return a set of broadcast IDs the sender has reacted to
+     * @param itemIds    the list of item IDs to check
+     * @param senderUuid the sender's UUID
+     * @return a set of item IDs the sender has reacted to
      * @throws SQLException if a database operation fails
      */
-    public Set<String> reactedBroadcastIds(List<String> broadcastIds, UUID senderUuid) throws SQLException {
-        if (broadcastIds.isEmpty())
+    public Set<String> reactedItemIds(List<String> itemIds, UUID senderUuid) throws SQLException {
+        if (itemIds.isEmpty())
             return Set.of();
-        String placeholders = broadcastIds.stream().map(id -> "?").collect(Collectors.joining(", "));
-        String sql = "SELECT broadcast_id FROM likes_events WHERE broadcast_id IN (" + placeholders
-                + ") AND sender_uuid = ?";
+        String placeholders = itemIds.stream().map(id -> "?").collect(Collectors.joining(", "));
+        String sql = "SELECT item_id FROM reactions WHERE item_id IN (" + placeholders
+                + ") AND reactor_uuid = ?";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < broadcastIds.size(); i++) {
-                ps.setString(i + 1, broadcastIds.get(i));
+            for (int i = 0; i < itemIds.size(); i++) {
+                ps.setString(i + 1, itemIds.get(i));
             }
-            ps.setString(broadcastIds.size() + 1, senderUuid.toString());
+            ps.setString(itemIds.size() + 1, senderUuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 Set<String> result = new HashSet<>();
                 while (rs.next()) {

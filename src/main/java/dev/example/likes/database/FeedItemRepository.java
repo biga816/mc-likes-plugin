@@ -1,71 +1,76 @@
 package dev.example.likes.database;
 
-import dev.example.likes.model.LikesBroadcast;
+import dev.example.likes.model.FeedItem;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Repository for accessing the likes_broadcasts table.
+ * Repository for accessing the feed_items table.
  */
-public class BroadcastRepository {
+public class FeedItemRepository {
 
     private final DatabaseManager databaseManager;
 
     /**
-     * Constructs a BroadcastRepository.
+     * Constructs a FeedItemRepository.
      *
      * @param databaseManager the database connection manager
      */
-    public BroadcastRepository(DatabaseManager databaseManager) {
+    public FeedItemRepository(DatabaseManager databaseManager) {
         this.databaseManager = databaseManager;
     }
 
     /**
-     * Saves a broadcast to the database.
+     * Saves a item to the database.
      *
-     * @param broadcast the broadcast to save
+     * @param item the item to save
      * @throws SQLException if a database operation fails
      */
-    public void save(LikesBroadcast broadcast) throws SQLException {
+    public void save(FeedItem item) throws SQLException {
         String sql = """
-                INSERT INTO likes_broadcasts
-                    (broadcast_id, server_id, display_code, created_at, source_type, source_sender_uuid, target_uuid, reason_code, reason_text)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO feed_items
+                    (item_id, server_id, display_code, created_at, item_type, author_uuid,
+                     initiator_uuid, body_text, world, x, y, z)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, broadcast.broadcastId());
-            ps.setString(2, broadcast.serverId());
-            ps.setString(3, broadcast.displayCode());
-            ps.setLong(4, broadcast.createdAt());
-            ps.setString(5, broadcast.sourceType());
-            ps.setString(6, broadcast.sourceSenderUuid().toString());
-            ps.setString(7, broadcast.targetUuid().toString());
-            ps.setString(8, broadcast.reasonCode());
-            ps.setString(9, broadcast.reasonText());
+            ps.setString(1, item.itemId());
+            ps.setString(2, item.serverId());
+            ps.setString(3, item.displayCode());
+            ps.setLong(4, item.createdAt());
+            ps.setString(5, item.itemType());
+            ps.setString(6, item.authorUuid().toString());
+            setNullableUuid(ps, 7, item.initiatorUuid());
+            ps.setString(8, item.bodyText());
+            setNullableString(ps, 9, item.world());
+            setNullableInteger(ps, 10, item.x());
+            setNullableInteger(ps, 11, item.y());
+            setNullableInteger(ps, 12, item.z());
             ps.executeUpdate();
         }
     }
 
     /**
-     * Finds the most recent broadcast matching the given serverId and displayCode.
+     * Finds the most recent item matching the given serverId and displayCode.
      *
      * @param serverId    the server ID to scope the lookup
      * @param displayCode the display code to search for
-     * @return an Optional containing the most recent matching broadcast, or empty
+     * @return an Optional containing the most recent matching item, or empty
      *         if not found
      * @throws SQLException if a database operation fails
      */
-    public Optional<LikesBroadcast> findLatestByDisplayCode(String serverId, String displayCode) throws SQLException {
+    public Optional<FeedItem> findLatestByDisplayCode(String serverId, String displayCode) throws SQLException {
         String sql = """
-                SELECT * FROM likes_broadcasts
+                SELECT * FROM feed_items
                 WHERE server_id = ?
                   AND display_code = ?
                 ORDER BY created_at DESC
@@ -85,16 +90,17 @@ public class BroadcastRepository {
     }
 
     /**
-     * Retrieves recent broadcasts for the given server, ordered by creation time descending.
+     * Retrieves recent items for the given server, ordered by creation time
+     * descending.
      *
      * @param serverId the server ID to filter by
      * @param limit    maximum number of results to return
-     * @return list of broadcasts ordered by created_at DESC
+     * @return list of items ordered by created_at DESC
      * @throws SQLException if a database operation fails
      */
-    public List<LikesBroadcast> findRecent(String serverId, int limit) throws SQLException {
+    public List<FeedItem> findRecent(String serverId, int limit) throws SQLException {
         String sql = """
-                SELECT * FROM likes_broadcasts
+                SELECT * FROM feed_items
                 WHERE server_id = ?
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -104,7 +110,7 @@ public class BroadcastRepository {
             ps.setString(1, serverId);
             ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                List<LikesBroadcast> results = new ArrayList<>();
+                List<FeedItem> results = new ArrayList<>();
                 while (rs.next()) {
                     results.add(mapRow(rs));
                 }
@@ -114,23 +120,23 @@ public class BroadcastRepository {
     }
 
     /**
-     * Checks whether a broadcast with the given displayCode exists within the most
-     * recent {@code recentWindow} broadcasts for the given server.
+     * Checks whether a item with the given displayCode exists within the most
+     * recent {@code recentWindow} items for the given server.
      *
      * @param serverId     the server ID to scope the check
      * @param displayCode  the display code to check
-     * @param recentWindow number of most recent broadcasts to search within
-     * @return true if a matching broadcast exists in the recent window
+     * @param recentWindow number of most recent items to search within
+     * @return true if a matching item exists in the recent window
      * @throws SQLException if a database operation fails
      */
     public boolean existsInRecentByDisplayCode(String serverId, String displayCode, int recentWindow)
             throws SQLException {
         String sql = """
-                SELECT 1 FROM likes_broadcasts
+                SELECT 1 FROM feed_items
                 WHERE server_id = ?
                   AND display_code = ?
-                  AND broadcast_id IN (
-                    SELECT broadcast_id FROM likes_broadcasts
+                  AND item_id IN (
+                    SELECT item_id FROM feed_items
                     WHERE server_id = ?
                     ORDER BY created_at DESC LIMIT ?
                 )
@@ -151,21 +157,21 @@ public class BroadcastRepository {
     // ── Mine-related read methods ─────────────────────────────────────────────
 
     /**
-     * Returns the most recent broadcasts in which the given player was the
+     * Returns the most recent items in which the given player was the
      * recipient, scoped to the given server.
      *
      * @param serverId   the server ID to filter by
      * @param playerUuid the recipient's UUID
      * @param limit      maximum number of results
-     * @return list of broadcasts ordered by created_at DESC
+     * @return list of items ordered by created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<LikesBroadcast> getRecentBroadcastsReceivedBy(String serverId, UUID playerUuid, int limit)
+    public List<FeedItem> getRecentItemsReceivedBy(String serverId, UUID playerUuid, int limit)
             throws SQLException {
         String sql = """
-                SELECT * FROM likes_broadcasts
+                SELECT * FROM feed_items
                 WHERE server_id = ?
-                  AND target_uuid = ?
+                  AND author_uuid = ?
                 ORDER BY created_at DESC
                 LIMIT ?
                 """;
@@ -175,7 +181,7 @@ public class BroadcastRepository {
             ps.setString(2, playerUuid.toString());
             ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                List<LikesBroadcast> results = new ArrayList<>();
+                List<FeedItem> results = new ArrayList<>();
                 while (rs.next()) {
                     results.add(mapRow(rs));
                 }
@@ -185,21 +191,21 @@ public class BroadcastRepository {
     }
 
     /**
-     * Returns the most recent broadcasts sent by the given player, scoped to the
+     * Returns the most recent items sent by the given player, scoped to the
      * given server.
      *
      * @param serverId   the server ID to filter by
      * @param playerUuid the sender's UUID
      * @param limit      maximum number of results
-     * @return list of broadcasts ordered by created_at DESC
+     * @return list of items ordered by created_at DESC
      * @throws SQLException if a database error occurs
      */
-    public List<LikesBroadcast> getRecentBroadcastsSentBy(String serverId, UUID playerUuid, int limit)
+    public List<FeedItem> getRecentItemsInitiatedBy(String serverId, UUID playerUuid, int limit)
             throws SQLException {
         String sql = """
-                SELECT * FROM likes_broadcasts
+                SELECT * FROM feed_items
                 WHERE server_id = ?
-                  AND source_sender_uuid = ?
+                  AND initiator_uuid = ?
                 ORDER BY created_at DESC
                 LIMIT ?
                 """;
@@ -209,7 +215,7 @@ public class BroadcastRepository {
             ps.setString(2, playerUuid.toString());
             ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                List<LikesBroadcast> results = new ArrayList<>();
+                List<FeedItem> results = new ArrayList<>();
                 while (rs.next()) {
                     results.add(mapRow(rs));
                 }
@@ -219,22 +225,50 @@ public class BroadcastRepository {
     }
 
     /**
-     * Maps the current row of a ResultSet to a LikesBroadcast.
+     * Maps the current row of a ResultSet to a FeedItem.
      *
      * @param rs the ResultSet to map from
-     * @return the mapped LikesBroadcast
+     * @return the mapped FeedItem
      * @throws SQLException if reading the ResultSet fails
      */
-    private LikesBroadcast mapRow(ResultSet rs) throws SQLException {
-        return new LikesBroadcast(
-                rs.getString("broadcast_id"),
+    private FeedItem mapRow(ResultSet rs) throws SQLException {
+        return new FeedItem(
+                rs.getString("item_id"),
                 rs.getString("server_id"),
                 rs.getString("display_code"),
                 rs.getLong("created_at"),
-                rs.getString("source_type"),
-                UUID.fromString(rs.getString("source_sender_uuid")),
-                UUID.fromString(rs.getString("target_uuid")),
-                rs.getString("reason_code"),
-                rs.getString("reason_text"));
+                rs.getString("item_type"),
+                UUID.fromString(rs.getString("author_uuid")),
+                parseNullableUuid(rs.getString("initiator_uuid")),
+                rs.getString("body_text"),
+                rs.getString("world"),
+                (Integer) rs.getObject("x"),
+                (Integer) rs.getObject("y"),
+                (Integer) rs.getObject("z"));
+    }
+
+    private static void setNullableUuid(PreparedStatement ps, int index, UUID value) throws SQLException {
+        if (value == null)
+            ps.setNull(index, Types.VARCHAR);
+        else
+            ps.setString(index, value.toString());
+    }
+
+    private static void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
+        if (value == null)
+            ps.setNull(index, Types.VARCHAR);
+        else
+            ps.setString(index, value);
+    }
+
+    private static void setNullableInteger(PreparedStatement ps, int index, Integer value) throws SQLException {
+        if (value == null)
+            ps.setNull(index, Types.INTEGER);
+        else
+            ps.setInt(index, value);
+    }
+
+    private static UUID parseNullableUuid(String value) {
+        return value == null ? null : UUID.fromString(value);
     }
 }

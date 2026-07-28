@@ -1,6 +1,6 @@
 package dev.example.likes.database;
 
-import dev.example.likes.model.LikePlayerStats;
+import dev.example.likes.model.PlayerStats;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Repository for the {@code like_player_stats} aggregation table.
+ * Repository for the {@code player_stats} aggregation table.
  * <p>
  * Write methods accept an explicit {@link Connection} so they can participate
  * in a caller-managed transaction via
@@ -50,7 +50,7 @@ public class PlayerStatsRepository {
     public void upsertSentCount(Connection conn, String serverId, UUID playerUuid, String playerName, long updatedAt)
             throws SQLException {
         String sql = """
-                INSERT INTO like_player_stats
+                INSERT INTO player_stats
                     (server_id, player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
                 VALUES (?, ?, ?, 0, 1, 0, ?)
                 ON CONFLICT(server_id, player_uuid) DO UPDATE SET
@@ -82,7 +82,7 @@ public class PlayerStatsRepository {
             long updatedAt)
             throws SQLException {
         String sql = """
-                INSERT INTO like_player_stats
+                INSERT INTO player_stats
                     (server_id, player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
                 VALUES (?, ?, ?, 1, 0, 0, ?)
                 ON CONFLICT(server_id, player_uuid) DO UPDATE SET
@@ -114,7 +114,7 @@ public class PlayerStatsRepository {
             long updatedAt)
             throws SQLException {
         String sql = """
-                INSERT INTO like_player_stats
+                INSERT INTO player_stats
                     (server_id, player_uuid, player_name, received_count, sent_count, reacted_count, updated_at)
                 VALUES (?, ?, ?, 0, 0, 1, ?)
                 ON CONFLICT(server_id, player_uuid) DO UPDATE SET
@@ -142,8 +142,8 @@ public class PlayerStatsRepository {
      * @return an Optional containing the stats, or empty
      * @throws SQLException if a database error occurs
      */
-    public Optional<LikePlayerStats> getPlayerStats(String serverId, UUID playerUuid) throws SQLException {
-        String sql = "SELECT * FROM like_player_stats WHERE server_id = ? AND player_uuid = ?";
+    public Optional<PlayerStats> getPlayerStats(String serverId, UUID playerUuid) throws SQLException {
+        String sql = "SELECT * FROM player_stats WHERE server_id = ? AND player_uuid = ?";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, serverId);
@@ -163,7 +163,7 @@ public class PlayerStatsRepository {
      * @return ordered list of player stats
      * @throws SQLException if a database error occurs
      */
-    public List<LikePlayerStats> getTopReceivedPlayers(String serverId, int limit) throws SQLException {
+    public List<PlayerStats> getTopReceivedPlayers(String serverId, int limit) throws SQLException {
         return queryTop(serverId, "received_count", limit);
     }
 
@@ -176,7 +176,7 @@ public class PlayerStatsRepository {
      * @return ordered list of player stats
      * @throws SQLException if a database error occurs
      */
-    public List<LikePlayerStats> getTopSentPlayers(String serverId, int limit) throws SQLException {
+    public List<PlayerStats> getTopSentPlayers(String serverId, int limit) throws SQLException {
         return queryTop(serverId, "sent_count", limit);
     }
 
@@ -189,19 +189,19 @@ public class PlayerStatsRepository {
      * @return ordered list of player stats
      * @throws SQLException if a database error occurs
      */
-    public List<LikePlayerStats> getTopReactedPlayers(String serverId, int limit) throws SQLException {
+    public List<PlayerStats> getTopReactedPlayers(String serverId, int limit) throws SQLException {
         return queryTop(serverId, "reacted_count", limit);
     }
 
-    private List<LikePlayerStats> queryTop(String serverId, String column, int limit) throws SQLException {
+    private List<PlayerStats> queryTop(String serverId, String column, int limit) throws SQLException {
         // column is a compile-time constant, not user input — safe to interpolate
-        String sql = "SELECT * FROM like_player_stats WHERE server_id = ? ORDER BY " + column + " DESC LIMIT ?";
+        String sql = "SELECT * FROM player_stats WHERE server_id = ? ORDER BY " + column + " DESC LIMIT ?";
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, serverId);
             ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
-                List<LikePlayerStats> results = new ArrayList<>();
+                List<PlayerStats> results = new ArrayList<>();
                 while (rs.next()) {
                     results.add(mapRow(rs));
                 }
@@ -210,8 +210,8 @@ public class PlayerStatsRepository {
         }
     }
 
-    private LikePlayerStats mapRow(ResultSet rs) throws SQLException {
-        return new LikePlayerStats(
+    private PlayerStats mapRow(ResultSet rs) throws SQLException {
+        return new PlayerStats(
                 UUID.fromString(rs.getString("player_uuid")),
                 rs.getString("player_name"),
                 rs.getLong("received_count"),

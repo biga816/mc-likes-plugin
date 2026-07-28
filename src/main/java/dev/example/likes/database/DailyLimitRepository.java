@@ -7,7 +7,7 @@ import java.sql.SQLException;
 import java.util.UUID;
 
 /**
- * Repository for accessing the likes_sender_daily table.
+ * Repository for accessing the sender_daily table.
  * Tracks the number of direct likes sent per player per server per day.
  */
 public class DailyLimitRepository {
@@ -35,8 +35,8 @@ public class DailyLimitRepository {
      */
     public int getDailyCount(String serverId, String date, UUID senderUuid) throws SQLException {
         String sql = """
-                SELECT direct_like_count FROM likes_sender_daily
-                WHERE date = ? AND server_id = ? AND sender_uuid = ?
+                SELECT count FROM sender_daily
+                WHERE date = ? AND server_id = ? AND player_uuid = ? AND action_type = 'DIRECT'
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -45,7 +45,7 @@ public class DailyLimitRepository {
             ps.setString(3, senderUuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("direct_like_count");
+                    return rs.getInt("count");
                 }
                 return 0;
             }
@@ -63,10 +63,10 @@ public class DailyLimitRepository {
      */
     public void increment(String serverId, String date, UUID senderUuid) throws SQLException {
         String sql = """
-                INSERT INTO likes_sender_daily (date, server_id, sender_uuid, direct_like_count)
-                VALUES (?, ?, ?, 1)
-                ON CONFLICT(date, server_id, sender_uuid) DO UPDATE SET
-                    direct_like_count = direct_like_count + 1
+                INSERT INTO sender_daily (date, server_id, player_uuid, action_type, count)
+                VALUES (?, ?, ?, 'DIRECT', 1)
+                ON CONFLICT(date, server_id, player_uuid, action_type) DO UPDATE SET
+                    count = count + 1
                 """;
         Connection conn = databaseManager.getConnection();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
