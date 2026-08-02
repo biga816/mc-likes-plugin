@@ -93,14 +93,6 @@ public class LikeFeedBookRenderer {
                                 FeedItem bc = pageItems.get(i);
 
                                 String timeStr = RelativeTimeFormatter.format(bc.createdAt(), tr);
-                                UUID leadingUuid = bc.initiatorUuid() != null
-                                                ? bc.initiatorUuid()
-                                                : bc.authorUuid();
-                                String senderName = BookComponents.truncate(
-                                                BookComponents.resolveName(leadingUuid),
-                                                MAX_NAME_LEN);
-                                String targetName = BookComponents.truncate(BookComponents.resolveName(bc.authorUuid()),
-                                                MAX_NAME_LEN);
                                 String reason = BookComponents.truncate(bc.bodyText(), MAX_REASON_LEN);
                                 long count = reactionCounts.getOrDefault(bc.itemId(), 0L);
                                 String code = bc.displayCode();
@@ -115,15 +107,9 @@ public class LikeFeedBookRenderer {
 
                                 // Line 2: sender→target [♡count]
                                 b.append(Component.text("  "));
-                                if ("CHAT".equals(bc.itemType())) {
-                                        b.append(Component.text(senderName + ": ")
-                                                        .color(BookComponents.nameColor(bc.authorUuid(), viewerUuid)));
-                                } else {
-                                        b.append(BookComponents.buildSenderArrowTarget(
-                                                        senderName, BookComponents.nameColor(leadingUuid, viewerUuid),
-                                                        targetName,
-                                                        BookComponents.nameColor(bc.authorUuid(), viewerUuid)));
-                                }
+                                b.append(BookComponents.buildItemParticipants(
+                                                bc.itemType(), bc.initiatorUuid(), bc.authorUuid(), viewerUuid,
+                                                MAX_NAME_LEN, MAX_NAME_LEN));
                                 b.append(BookComponents.buildClickableHeart(code, count, alreadyReacted, isViewer, tr));
                                 b.append(Component.newline());
 

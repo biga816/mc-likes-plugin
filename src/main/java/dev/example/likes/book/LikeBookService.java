@@ -164,7 +164,7 @@ public class LikeBookService {
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     List<Component> pages = mineRenderer.buildPages(stats, mostLiked, received, sent, reactionCounts,
-                            tr);
+                            player.getUniqueId(), tr);
                     openBook(player, tr.translate("likes.book.mine.title"), pages);
                 });
             } catch (SQLException e) {

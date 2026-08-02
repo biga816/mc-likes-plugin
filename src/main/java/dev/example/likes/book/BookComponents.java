@@ -58,6 +58,31 @@ class BookComponents {
     }
 
     /**
+     * Builds the participant portion of a feed item line.
+     * Chat items show only the author; direct Likes show sender→target.
+     * The returned component always includes one trailing space.
+     */
+    static Component buildItemParticipants(
+            String itemType,
+            UUID initiatorUuid,
+            UUID authorUuid,
+            UUID viewerUuid,
+            int directNameLength,
+            int chatNameLength) {
+        if ("CHAT".equals(itemType)) {
+            String authorName = truncate(resolveName(authorUuid), chatNameLength);
+            return Component.text(authorName + " ").color(nameColor(authorUuid, viewerUuid));
+        }
+
+        UUID senderUuid = initiatorUuid != null ? initiatorUuid : authorUuid;
+        String senderName = truncate(resolveName(senderUuid), directNameLength);
+        String targetName = truncate(resolveName(authorUuid), directNameLength);
+        return buildSenderArrowTarget(
+                senderName, nameColor(senderUuid, viewerUuid),
+                targetName, nameColor(authorUuid, viewerUuid));
+    }
+
+    /**
      * Builds a heart+count component that is clickable when the viewer
      * has not yet reacted and is not a participant.
      *

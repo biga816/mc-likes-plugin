@@ -98,13 +98,6 @@ public class LikeRankingBookRenderer {
                         int limit = Math.min(list.size(), MAX_POPULAR_ENTRIES);
                         for (int i = 0; i < limit; i++) {
                                 ItemRankingEntry entry = list.get(i);
-                                UUID leadingUuid = entry.initiatorUuid() != null
-                                                ? entry.initiatorUuid()
-                                                : entry.authorUuid();
-                                String senderName = BookComponents
-                                                .truncate(BookComponents.resolveName(leadingUuid), 7);
-                                String targetName = BookComponents
-                                                .truncate(BookComponents.resolveName(entry.authorUuid()), 7);
                                 String reason = BookComponents.truncate(entry.bodyText(), MAX_REASON_LEN);
                                 String code = entry.displayCode();
                                 boolean alreadyReacted = reactedItemIds.contains(entry.itemId());
@@ -114,17 +107,9 @@ public class LikeRankingBookRenderer {
                                 b.append(Component.newline());
                                 b.append(Component.text((i + 1) + ". ")
                                                 .color(NamedTextColor.DARK_GRAY));
-                                if ("CHAT".equals(entry.itemType())) {
-                                        b.append(Component.text(senderName + " ")
-                                                        .color(BookComponents.nameColor(entry.authorUuid(),
-                                                                        viewerUuid)));
-                                } else {
-                                        b.append(BookComponents.buildSenderArrowTarget(
-                                                        senderName,
-                                                        BookComponents.nameColor(leadingUuid, viewerUuid),
-                                                        targetName,
-                                                        BookComponents.nameColor(entry.authorUuid(), viewerUuid)));
-                                }
+                                b.append(BookComponents.buildItemParticipants(
+                                                entry.itemType(), entry.initiatorUuid(), entry.authorUuid(), viewerUuid,
+                                                7, 7));
                                 b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted,
                                                 isViewer, tr));
                                 b.append(Component.newline());
