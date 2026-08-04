@@ -1,7 +1,7 @@
 name: Likes
 version: ${version}
 main: dev.example.likes.LikesPlugin
-api-version: "1.21"
+api-version: "26.2"
 description: "In-game likes and reactions for positive community vibes."
 
 commands:

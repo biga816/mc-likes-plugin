@@ -2,12 +2,13 @@ package dev.example.likes.util;
 
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.translation.GlobalTranslator;
-import net.kyori.adventure.translation.TranslationRegistry;
+import net.kyori.adventure.translation.TranslationStore;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.PropertyResourceBundle;
 import java.util.ResourceBundle;
@@ -15,11 +16,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Manages Adventure's {@link TranslationRegistry} for the Likes plugin.
+ * Manages Adventure's {@link TranslationStore} for the Likes plugin.
  * <p>
  * Loads {@code .properties} files from the plugin JAR as UTF-8,
- * registers them with a {@link TranslationRegistry}, and adds the registry
- * to {@link GlobalTranslator} so that Paper/Adventure automatically resolves
+ * registers them with a message-format {@link TranslationStore}, and adds the
+ * store to {@link GlobalTranslator} so that Paper/Adventure automatically
+ * resolves
  * translations per each player's client locale.
  * </p>
  */
@@ -28,7 +30,7 @@ public class I18nService {
     private static final Logger log = Logger.getLogger(I18nService.class.getName());
     private static final Key REGISTRY_KEY = Key.key("likes", "translations");
 
-    private TranslationRegistry registry;
+    private TranslationStore.StringBased<MessageFormat> registry;
 
     /**
      * Initialises the translation registry and registers it with
@@ -38,7 +40,7 @@ public class I18nService {
      * @param classLoader the plugin's class loader used to locate resource files
      */
     public void initialize(ClassLoader classLoader) {
-        registry = TranslationRegistry.create(REGISTRY_KEY);
+        registry = TranslationStore.messageFormat(REGISTRY_KEY);
         registry.defaultLocale(Locale.US);
 
         // Load all three .properties files via UTF-8 streams to support non-ASCII
