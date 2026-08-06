@@ -28,9 +28,6 @@ public class LikeRankingBookRenderer {
         /** Max player name characters shown on rank list lines. */
         private static final int MAX_NAME_LEN = 10;
 
-        /** Max reason characters shown on popular likes entries. */
-        private static final int MAX_REASON_LEN = 17;
-
         /** Max entries shown on the Popular Likes page (2-line format). */
         private static final int MAX_POPULAR_ENTRIES = 6;
 
@@ -98,7 +95,7 @@ public class LikeRankingBookRenderer {
                         int limit = Math.min(list.size(), MAX_POPULAR_ENTRIES);
                         for (int i = 0; i < limit; i++) {
                                 ItemRankingEntry entry = list.get(i);
-                                String reason = BookComponents.truncate(entry.bodyText(), MAX_REASON_LEN);
+                                String reason = BookComponents.truncateReason(entry.bodyText());
                                 String code = entry.displayCode();
                                 boolean alreadyReacted = reactedItemIds.contains(entry.itemId());
                                 boolean isViewer = viewerUuid.equals(entry.initiatorUuid())
@@ -108,8 +105,8 @@ public class LikeRankingBookRenderer {
                                 b.append(Component.text((i + 1) + ". ")
                                                 .color(NamedTextColor.DARK_GRAY));
                                 b.append(BookComponents.buildItemParticipants(
-                                                entry.itemType(), entry.initiatorUuid(), entry.authorUuid(), viewerUuid,
-                                                7, 7));
+                                                entry.itemType(), entry.initiatorUuid(), entry.authorUuid(),
+                                                viewerUuid));
                                 b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted,
                                                 isViewer, tr));
                                 b.append(Component.newline());
@@ -134,7 +131,7 @@ public class LikeRankingBookRenderer {
                                 PlayerStats s = list.get(i);
                                 b.append(Component.newline());
                                 b.append(Component.text((i + 1) + ". ").color(NamedTextColor.DARK_GRAY));
-                                b.append(Component.text(BookComponents.truncate(s.playerName(), MAX_NAME_LEN))
+                                b.append(Component.text(BookComponents.truncateName(s.playerName(), MAX_NAME_LEN))
                                                 .color(NamedTextColor.BLACK));
                                 b.append(Component.text("  ♥" + countExtractor.applyAsLong(s))
                                                 .color(NamedTextColor.RED));

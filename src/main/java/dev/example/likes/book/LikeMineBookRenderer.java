@@ -25,10 +25,6 @@ import java.util.UUID;
  */
 public class LikeMineBookRenderer {
 
-    private static final int MAX_NAME_LEN = 14;
-    private static final int MAX_DIRECT_NAME_LEN = 7;
-    private static final int MAX_REASON_LEN = 17;
-
     /**
      * Builds all pages for the mine book.
      *
@@ -173,10 +169,10 @@ public class LikeMineBookRenderer {
 
     private void appendEntry(TextComponent.Builder b, String itemType, UUID initiatorUuid, UUID authorUuid,
             String bodyText, long count, long createdAt, UUID viewerUuid) {
-        String reason = BookComponents.truncate(bodyText, MAX_REASON_LEN);
+        String reason = BookComponents.truncateReason(bodyText);
 
         b.append(BookComponents.buildItemParticipants(
-                itemType, initiatorUuid, authorUuid, viewerUuid, MAX_DIRECT_NAME_LEN, MAX_NAME_LEN));
+                itemType, initiatorUuid, authorUuid, viewerUuid));
         b.append(Component.text("♥" + count + " ").color(NamedTextColor.RED));
         b.append(Component.newline());
         b.append(BookComponents.buildReasonLine(bodyText, reason, "   ", createdAt));

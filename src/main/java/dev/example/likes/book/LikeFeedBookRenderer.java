@@ -34,12 +34,6 @@ import java.util.UUID;
  */
 public class LikeFeedBookRenderer {
 
-        /** Max characters for sender/target names on feed entries. */
-        private static final int MAX_NAME_LEN = 7;
-
-        /** Max reason characters shown inline (hover reveals the full text). */
-        private static final int MAX_REASON_LEN = 17;
-
         /**
          * Builds all pages for the feed book.
          *
@@ -93,7 +87,7 @@ public class LikeFeedBookRenderer {
                                 FeedItem bc = pageItems.get(i);
 
                                 String timeStr = RelativeTimeFormatter.format(bc.createdAt(), tr);
-                                String reason = BookComponents.truncate(bc.bodyText(), MAX_REASON_LEN);
+                                String reason = BookComponents.truncateReason(bc.bodyText());
                                 long count = reactionCounts.getOrDefault(bc.itemId(), 0L);
                                 String code = bc.displayCode();
                                 boolean alreadyReacted = reactedItems.contains(bc.itemId());
@@ -106,15 +100,14 @@ public class LikeFeedBookRenderer {
                                 b.append(Component.newline());
 
                                 // Line 2: sender→target [♡count]
-                                b.append(Component.text("  "));
+                                b.append(Component.text(" "));
                                 b.append(BookComponents.buildItemParticipants(
-                                                bc.itemType(), bc.initiatorUuid(), bc.authorUuid(), viewerUuid,
-                                                MAX_NAME_LEN, MAX_NAME_LEN));
+                                                bc.itemType(), bc.initiatorUuid(), bc.authorUuid(), viewerUuid));
                                 b.append(BookComponents.buildClickableHeart(code, count, alreadyReacted, isViewer, tr));
                                 b.append(Component.newline());
 
                                 // Line 3: reason (truncated inline, full text on hover)
-                                b.append(BookComponents.buildReasonLine(bc.bodyText(), reason, "  ", bc.createdAt()));
+                                b.append(BookComponents.buildReasonLine(bc.bodyText(), reason, " ", bc.createdAt()));
 
                                 // Blank separator between entries (not after the last one on the page)
                                 if (i < pageItems.size() - 1) {

@@ -19,20 +19,77 @@ import java.util.UUID;
  */
 class BookComponents {
 
+    private static final int MAX_REASON_WIDTH = 34;
+    private static final int ASCII_WIDTH = 2;
+    private static final int NON_ASCII_WIDTH = 3;
+    private static final int MAX_DIRECT_NAME_LENGTH = 7;
+    private static final int MAX_CHAT_NAME_LENGTH = 14;
+
     private BookComponents() {
     }
 
     /**
-     * Truncates {@code text}
-     * to at most {@code max} characters,
-     * appending {@code ".."} when truncated.
+     * Truncates a player name to at most {@code max} characters, appending
+     * {@code ".."} when truncated.
      */
-    static String truncate(String text, int max) {
+    static String truncateName(String text, int max) {
         if (text == null)
             return "";
         if (text.length() <= max)
             return text;
         return text.substring(0, Math.max(0, max - 2)) + "..";
+    }
+
+    /**
+     * Truncates a reason to the book UI's display-width budget, appending
+     * {@code ".."} when truncated. Width is measured in half-character units:
+     * ASCII code points count as two units, while non-ASCII code points count as
+     * three. Combining marks do not consume additional width.
+     *
+     * <p>
+     * The iteration is code-point based so surrogate pairs are never split.
+     * </p>
+     */
+    static String truncateReason(String text) {
+        if (text == null || text.isEmpty())
+            return "";
+
+        int totalWidth = text.codePoints()
+                .map(BookComponents::displayWidth)
+                .sum();
+        if (totalWidth <= MAX_REASON_WIDTH)
+            return text;
+
+        String suffix = "..";
+        int suffixWidth = suffix.codePoints()
+                .map(BookComponents::displayWidth)
+                .sum();
+        int contentWidthLimit = MAX_REASON_WIDTH - suffixWidth;
+        StringBuilder result = new StringBuilder();
+        int usedWidth = 0;
+
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            int width = displayWidth(codePoint);
+            if (usedWidth + width > contentWidthLimit)
+                break;
+
+            result.appendCodePoint(codePoint);
+            usedWidth += width;
+            offset += Character.charCount(codePoint);
+        }
+
+        return result.append(suffix).toString();
+    }
+
+    private static int displayWidth(int codePoint) {
+        int type = Character.getType(codePoint);
+        if (type == Character.NON_SPACING_MARK
+                || type == Character.COMBINING_SPACING_MARK
+                || type == Character.ENCLOSING_MARK) {
+            return 0;
+        }
+        return codePoint <= 0x7f ? ASCII_WIDTH : NON_ASCII_WIDTH;
     }
 
     /**
@@ -66,17 +123,15 @@ class BookComponents {
             String itemType,
             UUID initiatorUuid,
             UUID authorUuid,
-            UUID viewerUuid,
-            int directNameLength,
-            int chatNameLength) {
+            UUID viewerUuid) {
         if ("CHAT".equals(itemType)) {
-            String authorName = truncate(resolveName(authorUuid), chatNameLength);
+            String authorName = truncateName(resolveName(authorUuid), MAX_CHAT_NAME_LENGTH);
             return Component.text(authorName + " ").color(nameColor(authorUuid, viewerUuid));
         }
 
         UUID senderUuid = initiatorUuid != null ? initiatorUuid : authorUuid;
-        String senderName = truncate(resolveName(senderUuid), directNameLength);
-        String targetName = truncate(resolveName(authorUuid), directNameLength);
+        String senderName = truncateName(resolveName(senderUuid), MAX_DIRECT_NAME_LENGTH);
+        String targetName = truncateName(resolveName(authorUuid), MAX_DIRECT_NAME_LENGTH);
         return buildSenderArrowTarget(
                 senderName, nameColor(senderUuid, viewerUuid),
                 targetName, nameColor(authorUuid, viewerUuid));
