@@ -102,12 +102,14 @@ public class LikeFeedBookRenderer {
                                 // Line 2: sender→target [♡count]
                                 b.append(Component.text(" "));
                                 b.append(BookComponents.buildItemParticipants(
-                                                bc.itemType(), bc.initiatorUuid(), bc.authorUuid(), viewerUuid));
+                                                bc.itemType(), bc.initiatorUuid(), bc.authorUuid(), viewerUuid,
+                                                BookComponents.ParticipantLayout.STANDARD));
                                 b.append(BookComponents.buildClickableHeart(code, count, alreadyReacted, isViewer, tr));
                                 b.append(Component.newline());
 
                                 // Line 3: reason (truncated inline, full text on hover)
-                                b.append(BookComponents.buildReasonLine(bc.bodyText(), reason, " ", bc.createdAt()));
+                                b.append(BookComponents.buildReasonLine(
+                                                bc.bodyText(), reason, " ", bc.createdAt(), count));
 
                                 // Blank separator between entries (not after the last one on the page)
                                 if (i < pageItems.size() - 1) {

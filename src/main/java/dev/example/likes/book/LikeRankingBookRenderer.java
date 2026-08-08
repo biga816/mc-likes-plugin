@@ -106,12 +106,13 @@ public class LikeRankingBookRenderer {
                                                 .color(NamedTextColor.DARK_GRAY));
                                 b.append(BookComponents.buildItemParticipants(
                                                 entry.itemType(), entry.initiatorUuid(), entry.authorUuid(),
-                                                viewerUuid));
+                                                viewerUuid, BookComponents.participantLayoutForNumberedItem(
+                                                                entry.reactionCount())));
                                 b.append(BookComponents.buildClickableHeart(code, entry.reactionCount(), alreadyReacted,
                                                 isViewer, tr));
                                 b.append(Component.newline());
                                 b.append(BookComponents.buildReasonLine(entry.bodyText(), reason, "   ",
-                                                entry.createdAt()));
+                                                entry.createdAt(), entry.reactionCount()));
                         }
                 }
                 return b.build();

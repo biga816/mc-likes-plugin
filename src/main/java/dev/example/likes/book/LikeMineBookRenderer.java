@@ -172,9 +172,11 @@ public class LikeMineBookRenderer {
         String reason = BookComponents.truncateReason(bodyText);
 
         b.append(BookComponents.buildItemParticipants(
-                itemType, initiatorUuid, authorUuid, viewerUuid));
-        b.append(Component.text("♥" + count + " ").color(NamedTextColor.RED));
+                itemType, initiatorUuid, authorUuid, viewerUuid,
+                BookComponents.participantLayoutForNumberedItem(count)));
+        b.append(Component.text("♥" + BookComponents.formatReactionCount(count) + " ")
+                .color(NamedTextColor.RED));
         b.append(Component.newline());
-        b.append(BookComponents.buildReasonLine(bodyText, reason, "   ", createdAt));
+        b.append(BookComponents.buildReasonLine(bodyText, reason, "   ", createdAt, count));
     }
 }

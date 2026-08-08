@@ -22,8 +22,20 @@ class BookComponents {
     private static final int MAX_REASON_WIDTH = 34;
     private static final int ASCII_WIDTH = 2;
     private static final int NON_ASCII_WIDTH = 3;
-    private static final int MAX_DIRECT_NAME_LENGTH = 7;
-    private static final int MAX_CHAT_NAME_LENGTH = 14;
+    private static final long MAX_DISPLAY_REACTION_COUNT = 99;
+
+    enum ParticipantLayout {
+        STANDARD(7, 15),
+        COMPACT(6, 13);
+
+        private final int directNameLength;
+        private final int chatNameLength;
+
+        ParticipantLayout(int directNameLength, int chatNameLength) {
+            this.directNameLength = directNameLength;
+            this.chatNameLength = chatNameLength;
+        }
+    }
 
     private BookComponents() {
     }
@@ -38,6 +50,23 @@ class BookComponents {
         if (text.length() <= max)
             return text;
         return text.substring(0, Math.max(0, max - 2)) + "..";
+    }
+
+    /**
+     * Formats an individual item's reaction count for the width-constrained book
+     * UI. Aggregate counts shown in summary views should remain unmodified.
+     */
+    static String formatReactionCount(long count) {
+        return count > MAX_DISPLAY_REACTION_COUNT
+                ? MAX_DISPLAY_REACTION_COUNT + "+"
+                : Long.toString(count);
+    }
+
+    /** Returns the participant layout for a numbered individual-item row. */
+    static ParticipantLayout participantLayoutForNumberedItem(long reactionCount) {
+        return reactionCount > MAX_DISPLAY_REACTION_COUNT
+                ? ParticipantLayout.COMPACT
+                : ParticipantLayout.STANDARD;
     }
 
     /**
@@ -123,15 +152,16 @@ class BookComponents {
             String itemType,
             UUID initiatorUuid,
             UUID authorUuid,
-            UUID viewerUuid) {
+            UUID viewerUuid,
+            ParticipantLayout layout) {
         if ("CHAT".equals(itemType)) {
-            String authorName = truncateName(resolveName(authorUuid), MAX_CHAT_NAME_LENGTH);
+            String authorName = truncateName(resolveName(authorUuid), layout.chatNameLength);
             return Component.text(authorName + " ").color(nameColor(authorUuid, viewerUuid));
         }
 
         UUID senderUuid = initiatorUuid != null ? initiatorUuid : authorUuid;
-        String senderName = truncateName(resolveName(senderUuid), MAX_DIRECT_NAME_LENGTH);
-        String targetName = truncateName(resolveName(authorUuid), MAX_DIRECT_NAME_LENGTH);
+        String senderName = truncateName(resolveName(senderUuid), layout.directNameLength);
+        String targetName = truncateName(resolveName(authorUuid), layout.directNameLength);
         return buildSenderArrowTarget(
                 senderName, nameColor(senderUuid, viewerUuid),
                 targetName, nameColor(authorUuid, viewerUuid));
@@ -152,7 +182,8 @@ class BookComponents {
     static Component buildClickableHeart(String code, long count, boolean alreadyReacted,
             boolean isViewer, PlayerTranslator tr) {
         String symbol = alreadyReacted ? "♥" : "♡";
-        Component heart = Component.text("[" + symbol + count + "]").color(NamedTextColor.RED);
+        Component heart = Component.text("[" + symbol + formatReactionCount(count) + "]")
+                .color(NamedTextColor.RED);
         if (!alreadyReacted && !isViewer) {
             heart = heart
                     .decorate(TextDecoration.UNDERLINED)
@@ -181,23 +212,27 @@ class BookComponents {
     private static final DateTimeFormatter REASON_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /**
-     * Builds a reason line that shows truncated text inline and the full
-     * text with creation date on hover.
+     * Builds a reason line that shows truncated text inline and the creation
+     * date, exact reaction count, and full text on hover.
      *
-     * @param fullText  the full reason text shown on hover
-     * @param truncated the truncated text shown inline
-     * @param indent    leading whitespace prefix (e.g. {@code "  "} or
-     *                  {@code "   "})
-     * @param createdAt item creation timestamp in epoch milliseconds
+     * @param fullText      the full reason text shown on hover
+     * @param truncated     the truncated text shown inline
+     * @param indent        leading whitespace prefix (e.g. {@code "  "} or
+     *                      {@code "   "})
+     * @param createdAt     item creation timestamp in epoch milliseconds
+     * @param reactionCount exact, untruncated reaction count
      * @return the styled component
      */
-    static Component buildReasonLine(String fullText, String truncated, String indent, long createdAt) {
+    static Component buildReasonLine(
+            String fullText, String truncated, String indent, long createdAt, long reactionCount) {
         String dateLabel = "[" + REASON_DATE_FORMAT.format(
                 Instant.ofEpochMilli(createdAt).atZone(ZoneId.systemDefault())) + "]";
         return Component.text(indent + "\"" + truncated + "\"")
                 .color(NamedTextColor.GRAY)
                 .hoverEvent(HoverEvent.showText(
                         Component.text(dateLabel).color(NamedTextColor.DARK_GRAY)
+                                .append(Component.newline())
+                                .append(Component.text("♥" + reactionCount).color(NamedTextColor.RED))
                                 .append(Component.newline())
                                 .append(Component.text(fullText != null ? fullText : "").color(NamedTextColor.GRAY))));
     }
