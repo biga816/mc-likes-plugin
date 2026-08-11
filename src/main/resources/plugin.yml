@@ -1,6 +1,6 @@
 name: Likes
 version: ${version}
-main: dev.example.likes.LikesPlugin
+main: dev.biga.likes.LikesPlugin
 api-version: "26.2"
 description: "In-game likes and reactions for positive community vibes."
 
