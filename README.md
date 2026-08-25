@@ -26,6 +26,12 @@ Likes provides a lightweight social system with feeds, rankings, personal statis
 
 ---
 
+# Screenshots
+
+![Likes plugin demo](docs/assets/demo.gif)
+
+---
+
 # Commands
 
 All commands require the `likes.use` permission (granted to all players by default).
