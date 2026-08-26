@@ -1,17 +1,17 @@
-name: Likes
+name: LikeBeacon
 version: ${version}
-main: dev.biga.likes.LikesPlugin
+main: dev.biga.likebeacon.LikeBeaconPlugin
 api-version: "26.2"
-description: "In-game likes and reactions for positive community vibes."
+description: "Likes, chat reactions, and a social feed for positive communities."
 
 commands:
   like:
     usage: "/like <player> <reason...> | /like #<code> | /like feed | /like ranking | /like mine | /like log"
 
 permissions:
-  likes.use:
+  likebeacon.use:
     default: true
-  likes.admin:
+  likebeacon.admin:
     default: op
-  likes.limit.bypass:
+  likebeacon.limit.bypass:
     default: op

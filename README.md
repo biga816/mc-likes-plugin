@@ -1,8 +1,8 @@
-# Likes
+# LikeBeacon
 
 A Minecraft Paper plugin that encourages positive interactions by allowing players to send direct Likes, like ordinary chat messages, and react to items in a unified feed.
 
-Likes provides a lightweight social system with feeds, rankings, personal statistics, and multilingual support, helping communities recognize and celebrate positive moments.
+LikeBeacon provides a lightweight social system with feeds, rankings, personal statistics, and multilingual support, helping communities recognize and celebrate positive moments.
 
 ---
 
@@ -28,13 +28,13 @@ Likes provides a lightweight social system with feeds, rankings, personal statis
 
 # Screenshots
 
-![Likes plugin demo](docs/assets/demo.gif)
+![LikeBeacon plugin demo](docs/assets/demo.gif)
 
 ---
 
 # Commands
 
-All commands require the `likes.use` permission (granted to all players by default).
+All commands require the `likebeacon.use` permission (granted to all players by default).
 
 | Command                        | Description                                    |
 | ------------------------------ | ---------------------------------------------- |
@@ -47,11 +47,11 @@ All commands require the `likes.use` permission (granted to all players by defau
 
 ## Permissions
 
-| Permission           | Default    | Description                        |
-| -------------------- | ---------- | ---------------------------------- |
-| `likes.use`          | Everyone   | Use all `/like` commands           |
-| `likes.admin`        | Operators  | Admin access                       |
-| `likes.limit.bypass` | Operators  | Bypass the daily Like limit        |
+| Permission                  | Default   | Description                      |
+| --------------------------- | --------- | -------------------------------- |
+| `likebeacon.use`            | Everyone  | Use all `/like` commands         |
+| `likebeacon.admin`          | Operators | Admin access                     |
+| `likebeacon.limit.bypass`   | Operators | Bypass the daily Like limit      |
 
 ## Tab Completion
 
@@ -75,19 +75,19 @@ All commands require the `likes.use` permission (granted to all players by defau
 1. Download the latest release JAR.
 2. Copy it into your server's `plugins/` directory.
 3. Start or restart the Paper server.
-4. Edit `plugins/Likes/config.yml` to configure the plugin (optional).
+4. Edit `plugins/LikeBeacon/config.yml` to configure the plugin (optional).
 5. Reload or restart the server if you changed the config.
 
 ---
 
 # Configuration
 
-The plugin generates `plugins/Likes/config.yml` automatically on first run with the following defaults.
+The plugin generates `plugins/LikeBeacon/config.yml` automatically on first run with the following defaults.
 
 | Key                          | Default   | Description                                                                                                                     |
 | ---------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `server-id`                  | `default` | Unique identifier to scope all Like data per server. Set a different value on each server in a multi-server network.            |
-| `limits.dailyDirectLikeLimit`| `20`      | Maximum number of Likes a player can send per day (UTC). Bypassed by the `likes.limit.bypass` permission.                      |
+| `limits.dailyDirectLikeLimit`| `20`      | Maximum number of Likes a player can send per day (UTC). Bypassed by the `likebeacon.limit.bypass` permission.                 |
 | `limits.pairCooldownSeconds` | `60`      | Cooldown in seconds before the same player can Like the same target again. Resets on server restart.                            |
 | `recent.bufferSize`          | `100`     | Size of the in-memory recent Like buffer loaded from the database on startup.                                                   |
 | `reason.maxLength`           | `48`      | Maximum character length of the Like reason text.                                                                               |
@@ -137,7 +137,7 @@ The unified feed uses these count definitions:
 Output:
 
 ```text
-build/libs/Likes-<version>.jar
+build/libs/LikeBeacon-<version>.jar
 ```
 
 The build uses the Shadow plugin to bundle the SQLite JDBC driver into the JAR.
@@ -152,7 +152,7 @@ This copies the plugin JAR and a fresh `config.yml` into:
 
 ```text
 paper-test/plugins/
-paper-test/plugins/Likes/config.yml
+paper-test/plugins/LikeBeacon/config.yml
 ```
 
 ## Start the Test Server
