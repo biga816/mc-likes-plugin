@@ -68,7 +68,7 @@ All commands require the `likebeacon.use` permission (granted to all players by 
 ## Requirements
 
 * Java 21 or later
-* Paper 1.21.x
+* Paper 1.21.4 or later (1.21.x)
 
 ## Steps
 
@@ -124,8 +124,8 @@ The unified feed uses these count definitions:
 
 ## Requirements
 
-* Java 21
-* Paper 1.21.x
+* Java 21 or later
+* Paper 1.21.4 or later (1.21.x)
 * Gradle
 
 ## Build
